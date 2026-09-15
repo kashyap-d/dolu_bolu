@@ -1,8 +1,8 @@
 # dolu bolu
 
-dolu bolu is a personal career-operations assistant for job seekers. It turns messages such as “I applied to Acme yesterday” into typed, editable action proposals, then waits for explicit approval before changing anything.
+dolu bolu is a personal career-operations assistant for job seekers. The current release focuses on application tracking: a user can add and update applications manually, or write a message such as “I applied to Acme yesterday” and review the structured action proposed by the assistant before anything is saved.
 
-The project is deliberately focused: dolu bolu helps a job seeker maintain applications, interviews, and follow-up tasks. It is not a job marketplace, an autonomous application bot, or a pile of unrelated AI features.
+The longer-term product is a trusted workspace for applications, interviews, and follow-ups. It is deliberately not a job marketplace, an autonomous application bot, or a generic chatbot with unrelated AI features.
 
 ## Why this architecture
 
@@ -19,20 +19,53 @@ message
 
 This keeps provider choice loosely coupled and makes the trust boundary testable. Development works with a deterministic demo provider; Gemini is the intended first free hosted provider. Other vendors can be evaluated behind the same contract without changing the product workflow.
 
-## Current foundation
+## Current project state
+
+The application vertical slice is working end to end:
+
+```text
+Google sign-in
+  -> protected workspace
+  -> manual form or natural-language message
+  -> editable application/proposal
+  -> authenticated database mutation
+  -> reload-safe application list
+```
+
+### Implemented
 
 - Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS.
 - Google OAuth through cookie-bound Supabase SSR clients.
 - Protected `/app` and `/app/applications` routes with server-side data loading.
-- A responsive command center with editable application proposals.
+- A responsive command center with manual application entry and editable AI proposals.
 - Shared schemas for applications, interviews, tasks, and proposal decisions.
 - A provider interface, a no-key deterministic development adapter, and a server-only Gemini structured-output adapter.
 - Durable pending proposals, atomic/idempotent application confirmation, and rejection through narrow Postgres functions.
-- Owner-scoped Row Level Security and server-authored activity history.
+- Deterministic manual application entry with retry-safe client IDs, plus editable lifecycle statuses guarded by optimistic concurrency.
+- Owner-scoped Row Level Security and a server-authored activity event when an AI proposal is confirmed.
 - A reload-safe application list plus local demo mode when Supabase is not configured.
-- Repository-wide product and engineering guidance in `AGENTS.md`.
+- Unit and contract tests for proposal validation, provider behavior, application payloads, and environment handling.
+- Repository-wide product and engineering guidance in `AGENTS.md` and a detailed trace of the AI proposal workflow in `WORKFLOW.md`.
 
-The first application-capture vertical slice is implemented. Interview/task execution, manual entry, and Calendar access remain intentionally out of scope for this milestone.
+### Engineering decisions worth discussing
+
+| Decision | Why it matters |
+| --- | --- |
+| The model proposes; deterministic code writes | Prevents unreviewed AI output from mutating user data. |
+| Provider-independent contract | Gemini, a local model, or another hosted model can be compared without rewriting the workflow. |
+| Schema and semantic validation | Treats model output as untrusted input and catches structurally valid but unsafe actions. |
+| Database RPC for proposal confirmation | Makes application creation, proposal completion, and activity recording atomic and retry-safe. |
+| Row Level Security | Enforces ownership in the database instead of relying only on UI or route checks. |
+| Optimistic concurrency for edits | Detects stale updates rather than silently overwriting a newer application state. |
+
+### Current limitations
+
+- Interviews and follow-up tasks have domain schemas, but do not yet have complete persistence and user workflows.
+- Manual application creation and lifecycle edits do not yet write activity events; only confirmed AI-created applications have an audit event.
+- The activity log is not yet visible in the interface.
+- Tests cover contracts and core logic, but there is no automated browser test suite or CI pipeline yet.
+- Provider latency and request IDs are returned, but there is no production observability dashboard or prompt/model regression history.
+- Application lists are intentionally simple and currently lack search, filtering, pagination, and duplicate warnings.
 
 ## Run locally
 
@@ -100,11 +133,24 @@ npm run build
 
 See `.env.example`. Only `NEXT_PUBLIC_` values may enter the browser bundle. AI keys and future service credentials stay server-side.
 
-## Near-term roadmap
+## Recommended roadmap
 
-1. Run the Gemini evaluation with a real key, then exercise application capture end to end without changing the repository default from demo.
-2. Add a deterministic manual application form and application lifecycle updates.
-3. Extend the proven proposal/confirmation pattern to interviews and tasks.
-4. Add separately authorized one-way Google Calendar event creation only after interview capture is dependable.
+The order below deepens the real use case while making each milestone demonstrate a different engineering skill.
 
-A hiring-manager assistant is intentionally deferred until dolu bolu is useful and dependable on its own.
+| Phase | Product outcome | Engineering signal |
+| --- | --- | --- |
+| 1. Trustworthy history | Record manual creates and edits atomically, show field-level activity, and warn about likely duplicates. | Transactions, audit design, concurrency, database constraints. |
+| 2. Interview workflow | Capture an interview from text, clarify missing date/timezone data, persist it, and allow edits. | Multi-step agent workflow, temporal validation, reusable domain architecture. |
+| 3. Calendar integration | Create a Google Calendar event only after approval and reconcile retries or later edits. | Scoped OAuth, third-party API integration, idempotency, failure recovery. |
+| 4. Follow-up engine | Suggest and schedule follow-ups from application state while keeping the user in control. | Background jobs, scheduling, retries, notifications, policy-based automation. |
+| 5. Production hardening | Add GitHub Actions, browser-level tests, structured logs, metrics, and a deployed demo. | CI/CD, E2E testing, observability, operational ownership. |
+
+## Selective additions that could make the project stand out
+
+These are useful extensions after the core roadmap, not a feature checklist:
+
+- **Evidence-grounded application brief:** extract requirements from a pasted job description and map them to facts the user has supplied about their experience. Show evidence and gaps rather than inventing a compatibility score. This can demonstrate retrieval, provenance, and AI evaluation without becoming another generic resume scorer.
+- **Next-action planner:** examine the user’s actual application state and propose a small set of reviewable next actions, such as preparing for an interview or following up after a chosen interval. Every action should use the same proposal-and-approval boundary as application capture.
+- **Provider evaluation report:** expand the sanitized fixture suite, compare model versions behind the common interface, and track correctness, latency, and cost. This makes the loosely coupled AI design measurable instead of merely architectural.
+
+A marketplace, autonomous mass application, email-wide access, and the hiring-manager assistant (“bolu”) are intentionally deferred. The strongest portfolio version is a smaller system with trustworthy workflows, failure handling, tests, and measurable AI quality—not a broad collection of disconnected features.

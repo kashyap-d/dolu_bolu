@@ -3,8 +3,11 @@ import { describe, it } from "node:test";
 
 import {
   applicationConfirmationPayloadSchema,
+  applicationUpdatePayloadSchema,
   confirmApplicationRequestSchema,
   confirmApplicationResponseSchema,
+  createManualApplicationRequestSchema,
+  updateApplicationRequestSchema,
 } from "../src/features/applications/contracts";
 
 function appliedApplication() {
@@ -73,6 +76,27 @@ describe("application confirmation contracts", () => {
     assert.equal(result.success, true);
   });
 
+  it("accepts lifecycle statuses when an applied date is present", () => {
+    const result = applicationUpdatePayloadSchema.safeParse({
+      ...appliedApplication(),
+      status: "interviewing",
+    });
+
+    assert.equal(result.success, true);
+  });
+
+  it("requires an applied date for lifecycle statuses beyond saved", () => {
+    const result = applicationUpdatePayloadSchema.safeParse({
+      ...appliedApplication(),
+      status: "offer",
+      appliedAt: null,
+    });
+
+    assert.equal(result.success, false);
+    if (result.success) throw new Error("Expected validation to fail");
+    assert.equal(result.error.issues[0]?.path.join("."), "appliedAt");
+  });
+
   it("rejects blank required fields after trimming", () => {
     const result = applicationConfirmationPayloadSchema.safeParse({
       ...appliedApplication(),
@@ -121,5 +145,27 @@ describe("application confirmation contracts", () => {
     });
 
     assert.equal(result.success, true);
+  });
+
+  it("uses a client-generated application id for idempotent manual creation", () => {
+    const result = createManualApplicationRequestSchema.safeParse({
+      applicationId: crypto.randomUUID(),
+      application: appliedApplication(),
+    });
+
+    assert.equal(result.success, true);
+  });
+
+  it("requires an optimistic concurrency timestamp for updates", () => {
+    const missingTimestamp = updateApplicationRequestSchema.safeParse({
+      application: appliedApplication(),
+    });
+    const complete = updateApplicationRequestSchema.safeParse({
+      expectedUpdatedAt: "2026-09-15T09:00:00.000Z",
+      application: { ...appliedApplication(), status: "screening" },
+    });
+
+    assert.equal(missingTimestamp.success, false);
+    assert.equal(complete.success, true);
   });
 });

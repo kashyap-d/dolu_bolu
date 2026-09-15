@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   LogOut,
   MessageCircleMore,
+  Plus,
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,10 +22,14 @@ import {
   type AssistantResponse,
 } from "@/features/assistant/contracts";
 import { ApplicationList } from "@/features/applications/application-list";
+import { ApplicationEditor } from "@/features/applications/application-editor";
 import { ApplicationProposalCard } from "@/features/applications/application-proposal-card";
 import {
   confirmApplicationResponseSchema,
+  createManualApplicationResponseSchema,
+  updateApplicationResponseSchema,
   type ApplicationConfirmationPayload,
+  type ApplicationEditorPayload,
   type ApplicationRecord,
   type ConfirmApplicationResponse,
 } from "@/features/applications/contracts";
@@ -34,6 +39,9 @@ type ApplicationProposal = Extract<
   { kind: "create_application" }
 >;
 type WorkspaceView = "command" | "applications";
+type ApplicationEditorState =
+  | { mode: "create" }
+  | { mode: "edit"; application: ApplicationRecord };
 
 interface CommandCenterProps {
   mode?: "demo" | "persistent";
@@ -162,6 +170,8 @@ export function CommandCenter({
     ),
   );
   const [applications, setApplications] = useState(initialApplications);
+  const [applicationEditor, setApplicationEditor] =
+    useState<ApplicationEditorState | null>(null);
 
   const greetingName = useMemo(
     () => viewer.displayName?.split(/\s+/)[0] || null,
@@ -335,6 +345,144 @@ export function CommandCenter({
     if (persistent) router.refresh();
   }
 
+  async function saveApplication(
+    applicationId: string,
+    application: ApplicationEditorPayload,
+  ) {
+    if (!applicationEditor) {
+      throw new Error("The application form is no longer open.");
+    }
+
+    let savedApplication: ApplicationRecord;
+    let message: string;
+
+    if (applicationEditor.mode === "create") {
+      if (application.status !== "saved" && application.status !== "applied") {
+        throw new Error("New applications must start as saved or applied.");
+      }
+
+      if (persistent) {
+        const response = await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicationId, application }),
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            await responseError(
+              response,
+              "The application could not be created. Please try again.",
+            ),
+          );
+        }
+
+        const parsed = createManualApplicationResponseSchema.safeParse(
+          await response.json(),
+        );
+        if (!parsed.success) {
+          throw new Error("The server returned an invalid application record.");
+        }
+        savedApplication = parsed.data.application;
+        message =
+          parsed.data.outcome === "already_created"
+            ? "This application had already been added. Your workspace is up to date."
+            : "Application added manually.";
+      } else {
+        const now = new Date().toISOString();
+        savedApplication = {
+          id: applicationId,
+          ...application,
+          createdAt: now,
+          updatedAt: now,
+        };
+        message = "Application added manually to this preview.";
+      }
+    } else if (persistent) {
+      const response = await fetch(
+        `/api/applications/${encodeURIComponent(applicationId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expectedUpdatedAt: applicationEditor.application.updatedAt,
+            application,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          await responseError(
+            response,
+            "The application could not be updated. Please try again.",
+          ),
+        );
+      }
+
+      const parsed = updateApplicationResponseSchema.safeParse(
+        await response.json(),
+      );
+      if (!parsed.success) {
+        throw new Error("The server returned an invalid application update.");
+      }
+      savedApplication = parsed.data.application;
+      message = "Application updated.";
+    } else {
+      const existing = applicationEditor.application;
+      savedApplication = {
+        id: existing.id,
+        ...application,
+        createdAt: existing.createdAt,
+        updatedAt: new Date().toISOString(),
+      };
+      message = "Application updated in this preview.";
+    }
+
+    setApplications((current) => [
+      savedApplication,
+      ...current.filter((item) => item.id !== savedApplication.id),
+    ]);
+    setApplicationEditor(null);
+    setError(null);
+    setSuccess(message);
+    if (persistent) router.refresh();
+  }
+
+  function applicationEditorElement() {
+    if (!applicationEditor) return null;
+
+    return (
+      <ApplicationEditor
+        application={
+          applicationEditor.mode === "edit"
+            ? applicationEditor.application
+            : undefined
+        }
+        key={
+          applicationEditor.mode === "edit"
+            ? `${applicationEditor.application.id}:${applicationEditor.application.updatedAt}`
+            : "new-application"
+        }
+        mode={applicationEditor.mode}
+        onCancel={() => setApplicationEditor(null)}
+        onSave={saveApplication}
+      />
+    );
+  }
+
+  function openCreateApplicationEditor() {
+    setApplicationEditor({ mode: "create" });
+    setSuccess(null);
+    setError(null);
+  }
+
+  function openEditApplicationEditor(application: ApplicationRecord) {
+    setApplicationEditor({ mode: "edit", application });
+    setSuccess(null);
+    setError(null);
+  }
+
   return (
     <div className="min-h-screen bg-transparent lg:grid lg:grid-cols-[246px_minmax(0,1fr)]">
       <aside className="hidden border-r border-[#e5e8e1] bg-[#f5f7f2]/90 px-4 py-5 backdrop-blur lg:flex lg:min-h-screen lg:flex-col">
@@ -378,7 +526,7 @@ export function CommandCenter({
               {persistent ? "Connected workspace" : "Local preview"}
             </span>
             <span className="rounded-full bg-[#eef3eb] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#55705b]">
-              v0.2
+              v0.3
             </span>
           </div>
           <p className="mt-2 text-xs leading-5 text-[#828981]">
@@ -484,22 +632,31 @@ export function CommandCenter({
                     Confirmed records, ordered by their latest update.
                   </p>
                 </div>
-                {persistent ? (
-                  <Link
-                    className="inline-flex items-center gap-2 self-start rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155] transition hover:border-[#bdcbb9] hover:text-[#294435]"
-                    href="/app"
-                  >
-                    <ArrowLeft size={15} /> Record an application
-                  </Link>
-                ) : (
+                <div className="flex flex-wrap gap-2 self-start">
                   <button
-                    className="inline-flex items-center gap-2 self-start rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155]"
-                    onClick={() => setDemoView("command")}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#294435] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#365642]"
+                    onClick={openCreateApplicationEditor}
                     type="button"
                   >
-                    <ArrowLeft size={15} /> Record an application
+                    <Plus size={15} /> Add manually
                   </button>
-                )}
+                  {persistent ? (
+                    <Link
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155] transition hover:border-[#bdcbb9] hover:text-[#294435]"
+                      href="/app"
+                    >
+                      <ArrowLeft size={15} /> Use assistant
+                    </Link>
+                  ) : (
+                    <button
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155]"
+                      onClick={() => setDemoView("command")}
+                      type="button"
+                    >
+                      <ArrowLeft size={15} /> Use assistant
+                    </button>
+                  )}
+                </div>
               </section>
 
               {loadError ? (
@@ -507,9 +664,22 @@ export function CommandCenter({
                   {loadError}
                 </p>
               ) : null}
-              <div className="mt-8">
+              {success ? (
+                <p
+                  aria-live="polite"
+                  className="mt-7 rounded-2xl border border-[#d5e4d3] bg-[#f4faf2] p-4 text-sm text-[#45604a]"
+                >
+                  {success}
+                </p>
+              ) : null}
+              {applicationEditor ? (
+                <div className="mt-8">{applicationEditorElement()}</div>
+              ) : null}
+              <div className={applicationEditor ? "mt-5" : "mt-8"}>
                 <ApplicationList
                   applications={applications}
+                  onCreateManual={openCreateApplicationEditor}
+                  onEdit={openEditApplicationEditor}
                   onReturnToCommandCenter={() => setDemoView("command")}
                   persistent={persistent}
                 />
@@ -614,7 +784,18 @@ export function CommandCenter({
                         {suggestion.label}
                       </button>
                     ))}
+                    <button
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#d4dfd1] bg-[#f4f8f1] px-3.5 py-2 text-xs font-semibold text-[#49604e] transition hover:border-[#b9cab6] hover:bg-white"
+                      onClick={openCreateApplicationEditor}
+                      type="button"
+                    >
+                      <Plus size={13} /> Add manually
+                    </button>
                   </div>
+
+                  {applicationEditor ? (
+                    <div className="mt-6">{applicationEditorElement()}</div>
+                  ) : null}
 
                   <div aria-live="polite" className="mt-6 space-y-4">
                     {isLoading ? (

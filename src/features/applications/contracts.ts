@@ -31,33 +31,50 @@ export const applicationRecordSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 }).strict();
 
+const editableApplicationShape = {
+  companyName: z.string().trim().min(1, "Company is required.").max(120),
+  roleTitle: z.string().trim().min(1, "Role is required.").max(160),
+  appliedAt: z.iso.datetime({ offset: true }).nullable(),
+  sourceUrl: httpUrl.nullable(),
+  notes: z.string().trim().max(2_000).nullable(),
+};
+
+function validateApplicationDate(
+  payload: { status: z.infer<typeof applicationStatusSchema>; appliedAt: string | null },
+  context: z.RefinementCtx,
+) {
+  if (payload.status !== "saved" && !payload.appliedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["appliedAt"],
+      message: "This status needs an application date and time.",
+    });
+  }
+
+  if (payload.status === "saved" && payload.appliedAt) {
+    context.addIssue({
+      code: "custom",
+      path: ["appliedAt"],
+      message: "Saved applications cannot have an applied date.",
+    });
+  }
+}
+
 export const applicationConfirmationPayloadSchema = z
   .object({
-    companyName: z.string().trim().min(1, "Company is required.").max(120),
-    roleTitle: z.string().trim().min(1, "Role is required.").max(160),
+    ...editableApplicationShape,
     status: z.enum(["saved", "applied"]),
-    appliedAt: z.iso.datetime({ offset: true }).nullable(),
-    sourceUrl: httpUrl.nullable(),
-    notes: z.string().trim().max(2_000).nullable(),
   })
   .strict()
-  .superRefine((payload, context) => {
-    if (payload.status === "applied" && !payload.appliedAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["appliedAt"],
-        message: "Applied applications need an application date and time.",
-      });
-    }
+  .superRefine(validateApplicationDate);
 
-    if (payload.status === "saved" && payload.appliedAt) {
-      context.addIssue({
-        code: "custom",
-        path: ["appliedAt"],
-        message: "Saved applications cannot have an applied date.",
-      });
-    }
-  });
+export const applicationUpdatePayloadSchema = z
+  .object({
+    ...editableApplicationShape,
+    status: applicationStatusSchema,
+  })
+  .strict()
+  .superRefine(validateApplicationDate);
 
 export const confirmApplicationRequestSchema = z.object({
   version: z.number().int().positive(),
@@ -70,10 +87,48 @@ export const confirmApplicationResponseSchema = z.object({
   application: applicationRecordSchema,
 }).strict();
 
+export const createManualApplicationRequestSchema = z
+  .object({
+    applicationId: z.uuid(),
+    application: applicationConfirmationPayloadSchema,
+  })
+  .strict();
+
+export const createManualApplicationResponseSchema = z
+  .object({
+    outcome: z.enum(["created", "already_created"]),
+    application: applicationRecordSchema,
+  })
+  .strict();
+
+export const updateApplicationRequestSchema = z
+  .object({
+    expectedUpdatedAt: z.iso.datetime({ offset: true }),
+    application: applicationUpdatePayloadSchema,
+  })
+  .strict();
+
+export const updateApplicationResponseSchema = z
+  .object({
+    outcome: z.literal("updated"),
+    application: applicationRecordSchema,
+  })
+  .strict();
+
 export type ApplicationRecord = z.infer<typeof applicationRecordSchema>;
 export type ApplicationConfirmationPayload = z.infer<
   typeof applicationConfirmationPayloadSchema
 >;
+export type ApplicationUpdatePayload = z.infer<
+  typeof applicationUpdatePayloadSchema
+>;
+export type ApplicationEditorPayload = ApplicationUpdatePayload;
 export type ConfirmApplicationResponse = z.infer<
   typeof confirmApplicationResponseSchema
+>;
+export type CreateManualApplicationResponse = z.infer<
+  typeof createManualApplicationResponseSchema
+>;
+export type UpdateApplicationResponse = z.infer<
+  typeof updateApplicationResponseSchema
 >;

@@ -48,6 +48,7 @@ The application-capture milestone is implemented in code as of September 2026:
 - `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes.
 - `/app` loads pending application proposals and records through owner-scoped repositories.
 - `/app/applications` is a functional, reload-safe application list.
+- Applications can also be created through a deterministic no-AI form. A client-generated record UUID makes retries idempotent, while lifecycle edits use `updatedAt` as an optimistic concurrency token so stale tabs cannot overwrite newer changes.
 - The deterministic demo provider remains the default. A server-only Gemini adapter implements the same boundary with JSON-schema output, explicit timeout/error mapping, and no silent fallback. Providers propose content, while trusted code assigns database identifiers and versions.
 - `evals/application-capture.json` and `npm run eval:ai` provide a sanitized shared behavior check before a hosted model is enabled.
 - Proposal persistence is request-idempotent. Confirmation and rejection use narrow `security definer` Postgres functions; confirmation locks rows and atomically creates the application, updates execution state, and appends an activity event.

@@ -1,4 +1,10 @@
-import { ArrowRight, BriefcaseBusiness, ExternalLink } from "lucide-react";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  ExternalLink,
+  Pencil,
+  Plus,
+} from "lucide-react";
 import Link from "next/link";
 
 import type { ApplicationRecord } from "@/features/applications/contracts";
@@ -37,15 +43,19 @@ function StatusBadge({ status }: { status: ApplicationRecord["status"] }) {
 export function ApplicationList({
   applications,
   persistent,
+  onCreateManual,
+  onEdit,
   onReturnToCommandCenter,
 }: {
   applications: ApplicationRecord[];
   persistent: boolean;
+  onCreateManual: () => void;
+  onEdit: (application: ApplicationRecord) => void;
   onReturnToCommandCenter?: () => void;
 }) {
   if (applications.length === 0) {
-    const content = (
-      <>
+    return (
+      <div className="flex min-h-72 flex-col items-center justify-center rounded-[24px] border border-dashed border-[#d5ddd2] bg-white/70 px-6 text-center">
         <span className="grid size-12 place-items-center rounded-2xl bg-[#eaf0e8] text-[#4e6b56]">
           <BriefcaseBusiness size={21} />
         </span>
@@ -53,46 +63,51 @@ export function ApplicationList({
           No applications yet
         </h2>
         <p className="mt-2 max-w-md text-sm leading-6 text-[#788078]">
-          Tell dolu bolu where you applied, review the extracted details, and the confirmed record will appear here.
+          Add the first record directly, or let dolu bolu prepare one from a message for you to review.
         </p>
-        <span className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#294435] px-4 py-2.5 text-sm font-semibold text-white">
-          Record an application <ArrowRight size={15} />
-        </span>
-      </>
-    );
-
-    return persistent ? (
-      <Link
-        className="flex min-h-72 flex-col items-center justify-center rounded-[24px] border border-dashed border-[#d5ddd2] bg-white/70 px-6 text-center transition hover:border-[#b9c8b7] hover:bg-white"
-        href="/app"
-      >
-        {content}
-      </Link>
-    ) : (
-      <button
-        className="flex min-h-72 w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-[#d5ddd2] bg-white/70 px-6 text-center transition hover:border-[#b9c8b7] hover:bg-white"
-        onClick={onReturnToCommandCenter}
-        type="button"
-      >
-        {content}
-      </button>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <button
+            className="inline-flex items-center gap-2 rounded-xl bg-[#294435] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#365642]"
+            onClick={onCreateManual}
+            type="button"
+          >
+            <Plus size={15} /> Add manually
+          </button>
+          {persistent ? (
+            <Link
+              className="inline-flex items-center gap-2 rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155] transition hover:border-[#bdcbb9] hover:text-[#294435]"
+              href="/app"
+            >
+              Use assistant <ArrowRight size={15} />
+            </Link>
+          ) : (
+            <button
+              className="inline-flex items-center gap-2 rounded-xl border border-[#dbe2d8] bg-white px-4 py-2.5 text-sm font-semibold text-[#536155]"
+              onClick={onReturnToCommandCenter}
+              type="button"
+            >
+              Use assistant <ArrowRight size={15} />
+            </button>
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="overflow-hidden rounded-[22px] border border-[#dfe5dc] bg-white shadow-[0_16px_45px_rgba(55,74,58,0.06)]">
-      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_130px_140px_36px] gap-4 border-b border-[#e9ede7] bg-[#f7f9f5] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7b857a] md:grid">
+      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_130px_140px_84px] gap-4 border-b border-[#e9ede7] bg-[#f7f9f5] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-[#7b857a] md:grid">
         <span>Company</span>
         <span>Role</span>
         <span>Status</span>
         <span>Applied</span>
-        <span className="sr-only">Source</span>
+        <span>Actions</span>
       </div>
 
       <div className="divide-y divide-[#edf0eb]">
         {applications.map((application) => (
           <article
-            className="grid gap-3 px-5 py-5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_130px_140px_36px] md:items-center md:gap-4 md:py-4"
+            className="grid gap-3 px-5 py-5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_130px_140px_84px] md:items-center md:gap-4 md:py-4"
             key={application.id}
           >
             <div className="min-w-0">
@@ -117,7 +132,7 @@ export function ApplicationList({
             <p className="text-xs text-[#727b71]">
               {formatDate(application.appliedAt)}
             </p>
-            <div>
+            <div className="flex items-center gap-1.5">
               {application.sourceUrl ? (
                 <a
                   aria-label={`Open source for ${application.companyName}`}
@@ -129,6 +144,14 @@ export function ApplicationList({
                   <ExternalLink size={15} />
                 </a>
               ) : null}
+              <button
+                aria-label={`Edit ${application.companyName} ${application.roleTitle}`}
+                className="grid size-9 place-items-center rounded-xl border border-[#e2e7df] text-[#657165] transition hover:border-[#bbc9b9] hover:text-[#294435]"
+                onClick={() => onEdit(application)}
+                type="button"
+              >
+                <Pencil size={14} />
+              </button>
             </div>
             {application.notes ? (
               <p className="text-xs leading-5 text-[#838a81] md:col-span-5">
