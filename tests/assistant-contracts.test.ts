@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  actionProposalDraftSchema,
   actionProposalSchema,
   assistantRequestSchema,
+  assistantResponseSchema,
+  providerResponseSchema,
   type ActionProposal,
+  type ActionProposalDraft,
 } from "../src/features/assistant/contracts";
 import {
   validateProposalEvidence,
@@ -14,6 +18,28 @@ import {
 function applicationProposal(): ActionProposal {
   return {
     id: crypto.randomUUID(),
+    version: 1,
+    ref: "draft:1",
+    kind: "create_application",
+    summary: "Record Frontend Engineer application at Acme",
+    evidence: [
+      { fieldPath: "companyName", quote: "Acme" },
+      { fieldPath: "roleTitle", quote: "Frontend Engineer" },
+    ],
+    assumptions: [],
+    payload: {
+      companyName: "Acme",
+      roleTitle: "Frontend Engineer",
+      status: "applied",
+      appliedAt: "2026-09-13T09:00:00.000Z",
+      sourceUrl: null,
+      notes: null,
+    },
+  };
+}
+
+function applicationProposalDraft(): ActionProposalDraft {
+  return {
     ref: "draft:1",
     kind: "create_application",
     summary: "Record Frontend Engineer application at Acme",
@@ -44,6 +70,83 @@ describe("assistant contracts", () => {
     assert.equal(actionProposalSchema.safeParse(proposal).success, false);
   });
 
+  it("accepts provider drafts without server-owned identifiers", () => {
+    assert.equal(
+      actionProposalDraftSchema.safeParse(applicationProposalDraft()).success,
+      true,
+    );
+  });
+
+  it("rejects server-owned identifiers in provider drafts", () => {
+    const draft = {
+      ...applicationProposalDraft(),
+      id: crypto.randomUUID(),
+      version: 1,
+    };
+
+    assert.equal(actionProposalDraftSchema.safeParse(draft).success, false);
+  });
+
+  it("requires persisted proposals to have an id and version", () => {
+    assert.equal(
+      actionProposalSchema.safeParse(applicationProposalDraft()).success,
+      false,
+    );
+  });
+
+  it("accepts draft proposals in provider responses", () => {
+    const result = providerResponseSchema.safeParse({
+      decision: {
+        kind: "proposals",
+        proposals: [applicationProposalDraft()],
+      },
+      metadata: {
+        provider: "demo",
+        model: "demo-v1",
+        latencyMs: 3,
+        isDemo: true,
+      },
+    });
+
+    assert.equal(result.success, true);
+  });
+
+  it("rejects draft proposals at the persisted assistant response boundary", () => {
+    const result = assistantResponseSchema.safeParse({
+      decision: {
+        kind: "proposals",
+        batchId: crypto.randomUUID(),
+        proposals: [applicationProposalDraft()],
+      },
+      metadata: {
+        provider: "demo",
+        model: "demo-v1",
+        latencyMs: 3,
+        isDemo: true,
+      },
+    });
+
+    assert.equal(result.success, false);
+  });
+
+  it("accepts persisted proposals at the assistant response boundary", () => {
+    const result = assistantResponseSchema.safeParse({
+      decision: {
+        kind: "proposals",
+        batchId: crypto.randomUUID(),
+        proposals: [applicationProposal()],
+      },
+      metadata: {
+        provider: "demo",
+        model: "demo-v1",
+        latencyMs: 3,
+        isDemo: true,
+      },
+    });
+
+    assert.equal(result.success, true);
+  });
+
   it("rejects a malformed timezone before provider invocation", () => {
     const result = assistantRequestSchema.safeParse({
       message: "I applied to Acme for Frontend Engineer.",
@@ -71,6 +174,7 @@ describe("confirmation readiness", () => {
   it("does not allow a reminder without a specific due time", () => {
     const proposal: ActionProposal = {
       id: crypto.randomUUID(),
+      version: 1,
       ref: "draft:1",
       kind: "create_task",
       summary: "Follow up with Acme",

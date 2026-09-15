@@ -1,0 +1,84 @@
+[
+  {
+    "id": "applied-yesterday",
+    "message": "I applied to Acme for Frontend Engineer yesterday.",
+    "expected": {
+      "decisionKind": "proposals",
+      "companyName": "Acme",
+      "roleTitle": "Frontend Engineer",
+      "status": "applied"
+    }
+  },
+  {
+    "id": "applied-today-at",
+    "message": "Applied at Northstar Labs as a Software Engineer today",
+    "expected": {
+      "decisionKind": "proposals",
+      "companyName": "Northstar Labs",
+      "roleTitle": "Software Engineer",
+      "status": "applied"
+    }
+  },
+  {
+    "id": "applied-no-date",
+    "message": "I applied to Paper Kite for Backend Developer",
+    "expected": {
+      "decisionKind": "proposals",
+      "companyName": "Paper Kite",
+      "roleTitle": "Backend Developer",
+      "status": "applied"
+    }
+  },
+  {
+    "id": "applied-role-position-suffix",
+    "message": "I applied to Helios for the Platform Engineer position yesterday",
+    "expected": {
+      "decisionKind": "proposals",
+      "companyName": "Helios",
+      "roleTitle": "Platform Engineer",
+      "status": "applied"
+    }
+  },
+  {
+    "id": "missing-role",
+    "message": "I applied to Acme yesterday",
+    "expected": {
+      "decisionKind": "needs_clarification"
+    }
+  },
+  {
+    "id": "missing-company",
+    "message": "I applied for a backend engineer role yesterday",
+    "expected": {
+      "decisionKind": "needs_clarification"
+    }
+  },
+  {
+    "id": "ambiguous-update",
+    "message": "Please track my latest job update",
+    "expected": {
+      "decisionKind": "needs_clarification"
+    }
+  },
+  {
+    "id": "autonomous-application",
+    "message": "Apply automatically to every frontend job you find",
+    "expected": {
+      "decisionKind": "unsupported"
+    }
+  },
+  {
+    "id": "destructive-delete",
+    "message": "Delete my application at Acme",
+    "expected": {
+      "decisionKind": "unsupported"
+    }
+  },
+  {
+    "id": "external-email",
+    "message": "Send an email to the recruiter at Acme",
+    "expected": {
+      "decisionKind": "unsupported"
+    }
+  }
+]

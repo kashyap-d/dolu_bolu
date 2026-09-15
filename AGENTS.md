@@ -41,6 +41,22 @@ The first end-to-end milestone is:
 5. Only an explicit confirmation creates the record.
 6. The new record remains visible after reload.
 
+## Current implementation state
+
+The application-capture milestone is implemented in code as of September 2026:
+
+- `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes.
+- `/app` loads pending application proposals and records through owner-scoped repositories.
+- `/app/applications` is a functional, reload-safe application list.
+- The deterministic demo provider remains the default. A server-only Gemini adapter implements the same boundary with JSON-schema output, explicit timeout/error mapping, and no silent fallback. Providers propose content, while trusted code assigns database identifiers and versions.
+- `evals/application-capture.json` and `npm run eval:ai` provide a sanitized shared behavior check before a hosted model is enabled.
+- Proposal persistence is request-idempotent. Confirmation and rejection use narrow `security definer` Postgres functions; confirmation locks rows and atomically creates the application, updates execution state, and appends an activity event.
+- The browser can edit a proposal but cannot directly mutate proposal execution state or author activity history.
+- Unfinished Interviews, Tasks, Search, and Calendar controls are hidden rather than presented as working features.
+- With no Supabase environment, `/` offers an explicitly temporary local preview. With Supabase configured, `/` redirects to `/app`.
+
+Before calling the hosted slice operational, apply both migrations in `supabase/migrations`, enable the Google provider, configure the Google callback URL, add the local/deployed `/auth/callback` URLs to Supabase's redirect allow list, and run the AI evaluation with the selected Gemini model.
+
 ## Explicit non-goals for V1
 
 - A general job marketplace or local-gigs marketplace.

@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ProposalDecision } from "@/features/assistant/contracts";
+import type { ProviderDecision } from "@/features/assistant/contracts";
 
 export interface ActionProposalInput {
   message: string;
@@ -18,7 +18,7 @@ export interface ActionProposalInput {
 }
 
 export interface ActionProposalResult {
-  decision: ProposalDecision;
+  decision: ProviderDecision;
   metadata: {
     provider: string;
     model: string;
@@ -40,6 +40,7 @@ export class AiProviderError extends Error {
     message: string,
     readonly code:
       | "AUTH"
+      | "CONFIGURATION"
       | "RATE_LIMITED"
       | "TIMEOUT"
       | "UNAVAILABLE"
@@ -53,4 +54,3 @@ export class AiProviderError extends Error {
     this.name = "AiProviderError";
   }
 }
-

@@ -1,17 +1,17 @@
 import "server-only";
 
+import { getAiProviderName } from "@/server/env";
+
 import type { ActionProposalProvider } from "./action-proposal-provider";
 import { DemoActionProposalProvider } from "./providers/demo";
+import { GeminiActionProposalProvider } from "./providers/gemini";
 
 export function getActionProposalProvider(): ActionProposalProvider {
-  const provider = process.env.AI_PROVIDER ?? "demo";
+  const provider = getAiProviderName();
 
   if (provider === "demo") {
     return new DemoActionProposalProvider();
   }
 
-  throw new Error(
-    `AI_PROVIDER=${provider} is not implemented yet. Use AI_PROVIDER=demo until a reviewed adapter is added.`,
-  );
+  return new GeminiActionProposalProvider();
 }
-

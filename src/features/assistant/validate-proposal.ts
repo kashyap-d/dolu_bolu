@@ -1,4 +1,6 @@
-import type { ActionProposal } from "./contracts";
+import type { ActionProposal, ActionProposalDraft } from "./contracts";
+
+type ValidatableProposal = ActionProposal | ActionProposalDraft;
 
 export interface ProposalIssue {
   fieldPath: string;
@@ -6,7 +8,7 @@ export interface ProposalIssue {
 }
 
 export function validateProposalForConfirmation(
-  proposal: ActionProposal,
+  proposal: ValidatableProposal,
 ): ProposalIssue[] {
   switch (proposal.kind) {
     case "create_application": {
@@ -59,7 +61,7 @@ export function validateProposalForConfirmation(
 
 export function validateProposalEvidence(
   sourceMessage: string,
-  proposal: ActionProposal,
+  proposal: ValidatableProposal,
 ): ProposalIssue[] {
   return proposal.evidence.flatMap((evidence) =>
     sourceMessage.includes(evidence.quote)

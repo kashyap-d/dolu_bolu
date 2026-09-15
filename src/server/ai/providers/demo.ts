@@ -70,10 +70,8 @@ export class DemoActionProposalProvider implements ActionProposalProvider {
 
       return {
         kind: "proposals",
-        batchId: crypto.randomUUID(),
         proposals: [
           {
-            id: crypto.randomUUID(),
             ref: "draft:1",
             kind: "create_application",
             summary: `Record ${roleTitle} application at ${companyName}`,
@@ -115,10 +113,8 @@ export class DemoActionProposalProvider implements ActionProposalProvider {
 
       return {
         kind: "proposals",
-        batchId: crypto.randomUUID(),
         proposals: [
           {
-            id: crypto.randomUUID(),
             ref: "draft:1",
             kind: "create_task",
             summary: `Create task: ${title}`,
