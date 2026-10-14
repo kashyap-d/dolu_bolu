@@ -59,3 +59,10 @@ describe("Job Drive contracts", () => {
     assert.equal(jobDriveProgressPayloadSchema.safeParse({ ...payload(), appliedAt: "Friday" }).success, false);
   });
 });
+
+describe("URL validation", () => {
+  it("reports an unparsable source URL as a validation issue instead of throwing", () => {
+    const result = jobDriveProgressPayloadSchema.safeParse({ ...payload(), sourceUrl: "not a url" });
+    assert.equal(result.success, false);
+  });
+});

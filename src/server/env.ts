@@ -4,6 +4,9 @@ import { z } from "zod";
 
 const supabaseProjectUrlSchema = z.url().refine(
   (value) => {
+    // Refinements run even when z.url() failed; an empty or invalid value
+    // must mean "not configured", not an exception on every request.
+    if (!URL.canParse(value)) return false;
     const url = new URL(value);
     return (
       ["http:", "https:"].includes(url.protocol) &&

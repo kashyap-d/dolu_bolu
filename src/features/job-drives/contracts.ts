@@ -1,10 +1,10 @@
 import { z } from "zod";
 
+// Zod 4 still runs refinements after z.url() fails, so guard the URL
+// constructor: an unparsable value must be a validation issue, not a throw.
 const httpUrl = z.url().max(2_048).refine(
-  (value) => {
-    const protocol = new URL(value).protocol;
-    return protocol === "http:" || protocol === "https:";
-  },
+  (value) =>
+    URL.canParse(value) && ["http:", "https:"].includes(new URL(value).protocol),
   { message: "Use an HTTP or HTTPS URL." },
 );
 
