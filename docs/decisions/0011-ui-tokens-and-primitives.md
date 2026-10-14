@@ -1,6 +1,6 @@
 # 0011 — UI tokens and primitives
 
-**Status:** Planned
+**Status:** Implemented (`src/app/globals.css`, `src/components/ui`)
 
 ## Decision
 - Keep Tailwind v4 and lucide icons. Fonts: Geist (body) and Manrope (display); Geist Mono was removed as unused.

@@ -43,20 +43,18 @@ The first end-to-end milestone is:
 
 ## Current implementation state
 
-The Job Drive foundation is implemented in code as of September 2026:
+As of October 2026 (Phases 0 and 1 of the plan in `README.md` are complete):
 
-- `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes.
-- `/app` loads pending drive proposals and records through owner-scoped repositories. `/app/drives` is the list; `/app/drives/[driveId]` is the detail/timeline view; `/app/applications` redirects for old bookmarks.
-- Drives can also be created and edited through deterministic forms. A client-generated UUID makes create retries idempotent, while lifecycle edits use `updatedAt` for optimistic concurrency.
-- The interactive stage bar supports click/keyboard use and opens only contextual OA/interview fields. Application and event dates remain optional.
-- The deterministic demo provider remains the default. A server-only Gemini adapter implements the same boundary with JSON-schema output, explicit timeout/error mapping, and no silent fallback. Providers propose content, while trusted code assigns database identifiers and versions.
-- `evals/job-drive-progress.json` and `npm run eval:ai` provide a sanitized behavior check covering applications, OA, interviews, offers, rejection, clarification, and unsafe autonomy.
-- Proposal persistence is request-idempotent. Manual saves plus AI confirmation/rejection use narrow `security definer` Postgres functions; each confirmed mutation atomically changes the drive/details and appends immutable field-level activity.
-- Forward and skipped-stage progress is accepted. Earlier information never causes AI regression; manual backward moves and reopening terminal drives require an explicit audited correction.
-- Likely duplicates are warnings based on source URL or company/role/location; users may open an existing drive or deliberately create a separate process.
-- The browser can edit a proposal but cannot directly mutate proposal execution state or author activity history.
+- `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes. `/app/applications` redirects to `/app/drives` via `next.config.ts`.
+- `src/app/app/layout.tsx` authenticates once and renders the shared app shell. `/app` (command center), `/app/drives` (list) and `/app/drives/[driveId]` (detail and activity) each load only the data they render; `error.tsx` and `loading.tsx` cover failures and slow loads.
+- Views write through a `WorkspaceGateway` and navigate through `WorkspaceLink`. The signed-in gateway calls the API and then `router.refresh()`, so the UI re-renders from the database. The no-Supabase preview at `/` reuses the same views with an in-memory gateway.
+- Route handlers are built on `src/server/http.ts` (authentication, JSON parsing, Zod validation, retryable 503 on `RepositoryError`). The browser calls them only through `src/features/workspace/api-client.ts`.
+- One message yields at most one proposal. `resolveProposal` is a pure function that resolves the target drive, merges details, and refuses unrequested corrections or regressions.
+- Hosted AI calls need an authenticated user and a reserved unit of the daily allowance (`consume_ai_request`, `AI_DAILY_REQUEST_LIMIT`). The deterministic provider is a test stand-in and the preview's only provider.
+- Manual saves and AI confirmation/rejection use narrow `security definer` Postgres functions. Each confirmed mutation atomically changes the drive/details and appends immutable field-level activity. Creates are idempotent via client UUIDs; edits use `updatedAt` for optimistic concurrency.
+- Likely duplicates are warnings, not hard constraints. Backward moves and reopening terminal drives require an explicit audited correction.
+- UI is built from tokens in `src/app/globals.css` and primitives in `src/components/ui`. Do not use raw hex colours in components.
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
-- With no Supabase environment, `/` offers an explicitly temporary local preview. With Supabase configured, `/` redirects to `/app`.
 
 Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order—including `20260916000000_job_drive_foundation.sql` and `20261014000000_ai_quota_and_legacy_cleanup.sql`—configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
@@ -104,23 +102,25 @@ message + bounded user context
 Keep these responsibilities separate:
 
 - `src/app`: routes, layouts, and thin route handlers.
-- `src/features`: domain contracts and feature UI.
+- `src/features`: domain contracts and feature UI (`assistant`, `job-drives`, `workspace`).
+- `src/components/ui`: design-system primitives with no domain knowledge.
 - `src/server/ai`: provider-independent orchestration and provider adapters.
 - `src/server/repositories`: owner-scoped persistence only.
 - `src/server/services`: authorization-aware workflows and deterministic execution.
+- `src/server/http.ts`: shared route-handler plumbing; new route handlers should use it.
 - `src/server/supabase`: cookie-bound server client utilities.
 - `src/lib`: small shared utilities that contain no privileged data access.
 - `supabase/migrations`: the reproducible database source of truth.
 - `docs/decisions`: architecture decision records. Read the relevant record before changing a decided area, and add a superseding record instead of contradicting one silently.
-- `tests`: unit and integration coverage; sanitized AI evaluation fixtures belong under `evals` when introduced.
+- `tests`: unit and integration coverage; sanitized AI evaluation fixtures live under `evals`.
 
 Browser components must not import server modules, provider SDKs, database credentials, or service-role clients. Route handlers should parse the request, call a server service, and return the smallest DTO the UI needs.
 
 ## AI contract
 
-`ActionProposalProvider` is the stable application-facing boundary. Provider-specific SDK types stay inside adapters. The default development adapter is deterministic and requires no key; Gemini is the intended first hosted adapter, with Groq or OpenAI added behind the same contract only when justified by evaluations.
+`ActionProposalProvider` is the stable application-facing boundary. Provider-specific SDK types stay inside adapters. The deterministic adapter requires no key and backs tests, evals, and the preview; Gemini is the hosted adapter, with Groq or OpenAI added behind the same contract only when justified by evaluations.
 
-The only supported proposal kind in the current product is `record_job_drive_progress`. It can match or create a drive, advance its stage, attach OA details, or update the consolidated interview phase in one reviewed transaction. Multiple unrelated actions per message remain unsupported.
+The only supported proposal kind in the current product is `record_job_drive_progress`. It can match or create a drive, advance its stage, attach OA details, or update the consolidated interview phase in one reviewed transaction. Exactly one proposal per message (docs/decisions/0008).
 
 Provider output is untrusted even when a vendor offers structured output. Validate it centrally with Zod, then run semantic checks in application code. Each proposal includes source evidence and visible assumptions; do not display invented confidence percentages.
 

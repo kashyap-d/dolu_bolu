@@ -1,6 +1,6 @@
 # dolu bolu — Job Drive workflow
 
-This is the implementation trace for v0.4. `AGENTS.md` remains the canonical product and engineering brief.
+This is the request-level implementation trace. `AGENTS.md` is the canonical product and engineering brief; `docs/decisions` records why the system is shaped this way.
 
 ## Mental model
 
@@ -48,11 +48,11 @@ The OA schema rejects a deadline before availability. The interview schema requi
 
 ## Manual workflow
 
-1. `JobDriveEditor` builds a `JobDriveProgressPayload` and validates it locally.
-2. A create sends a retry-safe browser-generated UUID to `POST /api/job-drives`.
+1. `JobDriveEditor` builds a `JobDriveProgressPayload` and validates it locally with the shared schema.
+2. The view calls the workspace gateway; the signed-in gateway uses the typed API client. A create sends a retry-safe browser-generated UUID to `POST /api/job-drives`.
 3. An edit sends `expectedUpdatedAt` to `PATCH /api/job-drives/[jobDriveId]`.
 4. A backward/reopening edit is labeled and sent with `isCorrection: true`.
-5. The route re-authenticates, re-validates, and calls `save_job_drive`.
+5. The route (built on `src/server/http.ts`) re-authenticates, re-validates, and calls `save_job_drive`.
 6. The public SQL wrapper fixes `source = manual`; clients cannot author the source field.
 7. The internal `apply_job_drive_change` function locks/creates the drive, upserts supplied OA/interview details, and appends the activity row in the same transaction.
 
@@ -61,15 +61,14 @@ If an exact source URL or a similar active company/role/location exists, creatio
 ## Assistant workflow
 
 1. The composer posts `{message, timeZone, locale, clientRequestId}` to `/api/assistant/proposals`.
-2. `prepareJobDriveProposals` first checks `(user_id, client_request_id)` for an idempotent replay.
-3. It loads at most 20 summaries from the user's recent drives and sends only those plus the message/time context to the selected provider.
-4. `ActionProposalProvider` returns `proposals`, `needs_clarification`, or `unsupported`.
-5. The only supported action is `record_job_drive_progress`.
-6. Zod validates the provider output; deterministic code verifies exact evidence substrings and required identity.
-7. A provider may reference only an opaque `job-drive:<uuid>` from supplied context. Trusted code resolves that reference, attaches the real owner-scoped ID and `updatedAt`, merges omitted existing detail, and prevents automatic regression.
-8. One proposal is persisted with a server-owned ID/version and displayed as an editable review card.
+2. `prepareProposal` first checks `(user_id, client_request_id)` for an idempotent replay.
+3. Before calling a hosted model it reserves one unit of the user's daily allowance (`consume_ai_request`). The unauthenticated preview never reaches a hosted model.
+4. It sends the message, time context, and at most 20 of the user's own drive summaries to the selected `ActionProposalProvider`.
+5. The provider returns exactly one of `proposal`, `needs_clarification`, or `unsupported`. The only action kind is `record_job_drive_progress`.
+6. Zod validates the output. `resolveProposal` (pure, unit-tested) then checks that evidence is quoted from the message, that a correction was explicitly requested, and that a referenced drive exists and agrees on company/role. It resolves the target drive, attaches its real ID and `updatedAt`, merges omitted details, and keeps earlier news from moving a drive backwards.
+7. Any issue becomes a clarification question. Otherwise one proposal is persisted with a server-owned ID/version and shown as an editable review card.
 
-Gemini lives behind the same interface as the deterministic demo adapter. There is no silent provider fallback.
+Gemini lives behind the same interface as the deterministic adapter. There is no silent provider fallback.
 
 ## Confirmation and rejection
 
@@ -114,11 +113,15 @@ Every successful manual or confirmed-AI mutation appends an activity event with 
 
 ## Interface
 
-- `JobDriveCommandCenter`: composer, review queue, manual entry, navigation, and client refresh state.
-- `JobDriveList`: company, role, stage, nearest important date, duplicate-safe create entry.
-- `JobDriveDetail`: lifecycle bar, OA/interview summaries, notes, and timeline.
-- `StageBar`: semantic buttons for consistent keyboard and click interaction.
-- `JobDriveEditor`: shared create/edit/review surface with only stage-relevant detail sections expanded.
+- `src/app/app/layout.tsx` authenticates once and renders `PersistentWorkspace`: the app shell, routed navigation, and the HTTP gateway. After a successful write the gateway calls `router.refresh()`, so the screen re-renders from the database rather than from optimistic client state.
+- `PreviewWorkspace` (at `/` without Supabase) renders the same views with an in-memory gateway and state-based navigation.
+- `CommandCenterView`: composer, review queue, manual entry, upcoming dates.
+- `DrivesView` / `JobDriveList`: company, role, stage, nearest important date.
+- `DriveDetailView` / `JobDriveDetail`: stage bar, OA/interview summaries, notes, activity.
+- `JobDriveEditor`: the shared create/edit/review form, expanding only stage-relevant sections.
+- `src/app/app/error.tsx` and `loading.tsx` handle failed and slow loads for every workspace route.
+
+Views never branch on mode: they use `useGateway()` for writes and `WorkspaceLink` for navigation.
 
 No placeholder task, Calendar, JD brief, marketplace, or recruiter controls are shown.
 
@@ -134,7 +137,7 @@ npm run build
 
 Current automated coverage includes all stages, unknown dates, OA windows, interview timezone rules, malformed URL/time input, forward skips, non-regression, terminal states, correction detection, AI ownership boundaries, evidence grounding, migration preservation clauses, provider error mapping, and unsafe-autonomy refusal.
 
-The v0.4 migration and hosted acceptance pass were completed against the connected Supabase project. The pass covered NLP creation and matching, manual stage changes, OA/interview persistence, duplicate resolution, explicit correction, reload persistence, legacy activity compatibility, and keyboard stage interaction. Responsive layout is implemented with breakpoint-based CSS; repeatable multi-viewport coverage remains part of the planned Playwright suite.
+The Job Drive migration and a hosted acceptance pass were completed against the connected Supabase project before the Phase 1 refactor; repeat it after applying `20261014000000_ai_quota_and_legacy_cleanup.sql`. The pass covered NLP creation and matching, manual stage changes, OA/interview persistence, duplicate resolution, explicit correction, reload persistence, legacy activity compatibility, and keyboard stage interaction. Responsive layout is implemented with breakpoint-based CSS; repeatable multi-viewport coverage remains part of the planned Playwright suite.
 
 ## Deliberate next steps
 

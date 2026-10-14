@@ -1,6 +1,6 @@
 # 0002 — Route handlers for mutations
 
-**Status:** Accepted; typed client and handler helper planned
+**Status:** Implemented (`src/server/http.ts`, `src/features/workspace/api-client.ts`)
 
 ## Context
 Mutations need explicit outcomes: created, duplicate warning (409), version conflict (409), quota (429), provider failure (5xx). Server Actions remove fetch boilerplate but make those contracts implicit and harder to test, and other clients (a browser extension, mobile) may follow.

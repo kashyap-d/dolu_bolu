@@ -1,6 +1,6 @@
 # 0012 — Testing, CI, and hosting
 
-**Status:** CI implemented; test layers and hosting planned
+**Status:** CI and unit layer implemented; database, end-to-end, and hosting planned
 
 ## Decision
 - **Unit:** `node:test` + `tsx` for pure domain logic, including proposal materialisation (to be extracted from the service).
