@@ -1,7 +1,7 @@
 import type {
   ActionProposal,
   ActionProposalDraft,
-} from "./job-drive-contracts";
+} from "./contracts";
 
 type ValidatableProposal = ActionProposal | ActionProposalDraft;
 

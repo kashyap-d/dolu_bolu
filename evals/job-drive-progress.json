@@ -2,37 +2,37 @@
   {
     "id": "applied_with_date",
     "message": "I applied to Linear for Frontend Engineer yesterday.",
-    "expected": { "decisionKind": "proposals", "companyName": "Linear", "roleTitle": "Frontend Engineer", "stage": "applied" }
+    "expected": { "decisionKind": "proposal", "companyName": "Linear", "roleTitle": "Frontend Engineer", "stage": "applied" }
   },
   {
     "id": "applied_unknown_date",
     "message": "I applied at Acme as a Backend Engineer.",
-    "expected": { "decisionKind": "proposals", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "applied", "appliedAtMustBeNull": true }
+    "expected": { "decisionKind": "proposal", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "applied", "appliedAtMustBeNull": true }
   },
   {
     "id": "assessment_progress",
     "message": "OA at Stripe for Software Engineer tomorrow.",
-    "expected": { "decisionKind": "proposals", "companyName": "Stripe", "roleTitle": "Software Engineer", "stage": "assessment", "appliedAtMustBeNull": true, "hasAssessment": true }
+    "expected": { "decisionKind": "proposal", "companyName": "Stripe", "roleTitle": "Software Engineer", "stage": "assessment", "appliedAtMustBeNull": true, "hasAssessment": true }
   },
   {
     "id": "interview_progress",
     "message": "Interview at Notion for Product Engineer tomorrow.",
-    "expected": { "decisionKind": "proposals", "companyName": "Notion", "roleTitle": "Product Engineer", "stage": "interview", "hasInterview": true }
+    "expected": { "decisionKind": "proposal", "companyName": "Notion", "roleTitle": "Product Engineer", "stage": "interview", "hasInterview": true }
   },
   {
     "id": "offer_progress",
     "message": "Offer from Figma for Software Engineer.",
-    "expected": { "decisionKind": "proposals", "companyName": "Figma", "roleTitle": "Software Engineer", "stage": "offer" }
+    "expected": { "decisionKind": "proposal", "companyName": "Figma", "roleTitle": "Software Engineer", "stage": "offer" }
   },
   {
     "id": "rejection_progress",
     "message": "Rejected from Acme for Backend Engineer.",
-    "expected": { "decisionKind": "proposals", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "rejected" }
+    "expected": { "decisionKind": "proposal", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "rejected" }
   },
   {
     "id": "planned_drive",
     "message": "Track Canva for Platform Engineer.",
-    "expected": { "decisionKind": "proposals", "companyName": "Canva", "roleTitle": "Platform Engineer", "stage": "planned" }
+    "expected": { "decisionKind": "proposal", "companyName": "Canva", "roleTitle": "Platform Engineer", "stage": "planned" }
   },
   {
     "id": "matched_existing_drive",
@@ -40,7 +40,7 @@
     "context": [
       { "ref": "job-drive:11111111-1111-4111-8111-111111111111", "companyName": "Linear", "roleTitle": "Frontend Engineer", "stage": "assessment", "location": null, "sourceUrl": null, "updatedAt": "2026-09-15T10:00:00.000Z" }
     ],
-    "expected": { "decisionKind": "proposals", "companyName": "Linear", "roleTitle": "Frontend Engineer", "stage": "interview", "jobDriveRef": "job-drive:11111111-1111-4111-8111-111111111111" }
+    "expected": { "decisionKind": "proposal", "companyName": "Linear", "roleTitle": "Frontend Engineer", "stage": "interview", "jobDriveRef": "job-drive:11111111-1111-4111-8111-111111111111" }
   },
   {
     "id": "ambiguous_same_company",
@@ -54,7 +54,7 @@
   {
     "id": "accepted_progress",
     "message": "Accepted at Figma for Software Engineer.",
-    "expected": { "decisionKind": "proposals", "companyName": "Figma", "roleTitle": "Software Engineer", "stage": "accepted" }
+    "expected": { "decisionKind": "proposal", "companyName": "Figma", "roleTitle": "Software Engineer", "stage": "accepted" }
   },
   {
     "id": "explicit_correction",
@@ -62,7 +62,7 @@
     "context": [
       { "ref": "job-drive:44444444-4444-4444-8444-444444444444", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "rejected", "location": null, "sourceUrl": null, "updatedAt": "2026-09-15T10:00:00.000Z" }
     ],
-    "expected": { "decisionKind": "proposals", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "interview", "jobDriveRef": "job-drive:44444444-4444-4444-8444-444444444444", "isCorrection": true }
+    "expected": { "decisionKind": "proposal", "companyName": "Acme", "roleTitle": "Backend Engineer", "stage": "interview", "jobDriveRef": "job-drive:44444444-4444-4444-8444-444444444444", "isCorrection": true }
   },
   {
     "id": "missing_role_never_invented",

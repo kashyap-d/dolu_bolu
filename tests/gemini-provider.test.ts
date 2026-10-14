@@ -31,10 +31,9 @@ function successfulResponse() {
             parts: [
               {
                 text: JSON.stringify({
-                  kind: "proposals",
-                  proposals: [
+                  kind: "proposal",
+                  proposal:
                     {
-                      ref: "draft:1",
                       kind: "record_job_drive_progress",
                       summary: "Move Acme · Frontend Engineer to Applied",
                       evidence: [
@@ -58,7 +57,6 @@ function successfulResponse() {
                         interview: null,
                       },
                     },
-                  ],
                 }),
               },
             ],
@@ -86,7 +84,7 @@ describe("Gemini action proposal provider", () => {
 
     assert.equal(apiKey, "test-key");
     assert.equal(result.metadata.provider, "gemini");
-    assert.equal(result.decision.kind, "proposals");
+    assert.equal(result.decision.kind, "proposal");
     assert.equal(
       typeof requestBody === "object" && requestBody !== null,
       true,
@@ -124,7 +122,7 @@ describe("Gemini action proposal provider", () => {
       new Response(
         JSON.stringify({
           candidates: [
-            { content: { parts: [{ text: '{"kind":"proposals"}' }] } },
+            { content: { parts: [{ text: '{"kind":"proposal"}' }] } },
           ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },

@@ -10,12 +10,13 @@ export const evidenceSchema = z
   .strict();
 
 const proposalContentShape = {
-  ref: z.string().regex(/^draft:[1-5]$/),
+  kind: z.literal("record_job_drive_progress"),
   summary: z.string().min(1).max(180),
   evidence: z.array(evidenceSchema).max(8),
   assumptions: z.array(z.string().min(1).max(180)).max(8),
 };
 
+/** What a provider may propose. It can reference a drive only by an opaque context ref. */
 export const providerJobDrivePayloadSchema = jobDriveProgressPayloadSchema
   .omit({ companyName: true, roleTitle: true })
   .extend({
@@ -26,6 +27,7 @@ export const providerJobDrivePayloadSchema = jobDriveProgressPayloadSchema
   })
   .strict();
 
+/** What trusted code stores after resolving the target drive and merging details. */
 export const persistedJobDriveProgressPayloadSchema =
   jobDriveProgressPayloadSchema
     .extend({
@@ -38,7 +40,6 @@ export const persistedJobDriveProgressPayloadSchema =
 export const actionProposalDraftSchema = z
   .object({
     ...proposalContentShape,
-    kind: z.literal("record_job_drive_progress"),
     payload: providerJobDrivePayloadSchema,
   })
   .strict();
@@ -48,54 +49,40 @@ export const actionProposalSchema = z
     id: z.uuid(),
     version: z.number().int().positive(),
     ...proposalContentShape,
-    kind: z.literal("record_job_drive_progress"),
     payload: persistedJobDriveProgressPayloadSchema,
   })
   .strict();
 
+const clarificationDecisionSchema = z
+  .object({
+    kind: z.literal("needs_clarification"),
+    question: z.string().min(1).max(240),
+    missingFields: z.array(z.string().min(1).max(80)).min(1).max(8),
+  })
+  .strict();
+
+const unsupportedDecisionSchema = z
+  .object({
+    kind: z.literal("unsupported"),
+    message: z.string().min(1).max(240),
+  })
+  .strict();
+
+/** One message produces at most one proposal (see docs/decisions/0008). */
 export const providerDecisionSchema = z.discriminatedUnion("kind", [
   z
-    .object({
-      kind: z.literal("proposals"),
-      proposals: z.array(actionProposalDraftSchema).min(1).max(5),
-    })
+    .object({ kind: z.literal("proposal"), proposal: actionProposalDraftSchema })
     .strict(),
-  z
-    .object({
-      kind: z.literal("needs_clarification"),
-      question: z.string().min(1).max(240),
-      missingFields: z.array(z.string().min(1).max(80)).min(1).max(8),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("unsupported"),
-      message: z.string().min(1).max(240),
-    })
-    .strict(),
+  clarificationDecisionSchema,
+  unsupportedDecisionSchema,
 ]);
 
-const proposalDecisionSchema = z.discriminatedUnion("kind", [
+const assistantDecisionSchema = z.discriminatedUnion("kind", [
   z
-    .object({
-      kind: z.literal("proposals"),
-      batchId: z.uuid(),
-      proposals: z.array(actionProposalSchema).min(1).max(5),
-    })
+    .object({ kind: z.literal("proposal"), proposal: actionProposalSchema })
     .strict(),
-  z
-    .object({
-      kind: z.literal("needs_clarification"),
-      question: z.string().min(1).max(240),
-      missingFields: z.array(z.string().min(1).max(80)).min(1).max(8),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("unsupported"),
-      message: z.string().min(1).max(240),
-    })
-    .strict(),
+  clarificationDecisionSchema,
+  unsupportedDecisionSchema,
 ]);
 
 const providerMetadataSchema = z
@@ -107,16 +94,12 @@ const providerMetadataSchema = z
   })
   .strict();
 
-export const assistantRequestSchema = z
-  .object({
-    message: z.string().trim().min(1).max(2_000),
-    timeZone: z.string().min(1).max(80),
-    locale: z.string().min(2).max(35).default("en-IN"),
-    clientRequestId: z.uuid(),
-  })
-  .strict()
+const timeZoneSchema = z
+  .string()
+  .min(1)
+  .max(80)
   .refine(
-    ({ timeZone }) => {
+    (timeZone) => {
       try {
         Intl.DateTimeFormat(undefined, { timeZone });
         return true;
@@ -124,8 +107,17 @@ export const assistantRequestSchema = z
         return false;
       }
     },
-    { path: ["timeZone"], message: "Must be a valid IANA time zone" },
+    { message: "Must be a valid IANA time zone" },
   );
+
+export const assistantRequestSchema = z
+  .object({
+    message: z.string().trim().min(1).max(2_000),
+    timeZone: timeZoneSchema,
+    locale: z.string().min(2).max(35).default("en-IN"),
+    clientRequestId: z.uuid(),
+  })
+  .strict();
 
 export const providerResponseSchema = z
   .object({
@@ -136,13 +128,25 @@ export const providerResponseSchema = z
 
 export const assistantResponseSchema = z
   .object({
-    decision: proposalDecisionSchema,
+    decision: assistantDecisionSchema,
     metadata: providerMetadataSchema,
   })
+  .strict();
+
+export const rejectProposalRequestSchema = z
+  .object({ version: z.number().int().positive() })
+  .strict();
+
+export const rejectProposalResponseSchema = z
+  .object({ outcome: z.enum(["rejected", "already_rejected"]) })
   .strict();
 
 export type ActionProposalDraft = z.infer<typeof actionProposalDraftSchema>;
 export type ActionProposal = z.infer<typeof actionProposalSchema>;
 export type ProviderDecision = z.infer<typeof providerDecisionSchema>;
 export type AssistantRequest = z.infer<typeof assistantRequestSchema>;
+export type AssistantRequestInput = z.input<typeof assistantRequestSchema>;
 export type AssistantResponse = z.infer<typeof assistantResponseSchema>;
+export type PersistedJobDriveProgressPayload = z.infer<
+  typeof persistedJobDriveProgressPayloadSchema
+>;

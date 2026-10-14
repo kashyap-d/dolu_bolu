@@ -1,44 +1,94 @@
 @import "tailwindcss";
 
-:root {
-  --ink: #20251f;
-  --muted: #737b70;
-  --line: #e5e8e1;
-  --paper: #fbfcf8;
-  --surface: #ffffff;
-  --sage: #4d6b57;
-  --sage-dark: #294435;
-  --sage-soft: #e9f0e8;
-  --amber: #ddaa59;
+/*
+ * Design tokens. Components use these semantic utilities (bg-surface,
+ * text-muted, border-line, bg-brand, …) and never raw hex values, so the
+ * palette can change — or gain a dark theme — in one place.
+ * See docs/decisions/0011-ui-tokens-and-primitives.md.
+ */
+@theme {
+  /* Neutrals */
+  --color-canvas: #fbfcf8;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7f9f5;
+  --color-sidebar: #f4f6f1;
+  --color-line: #e6eae3;
+  --color-line-strong: #d6ded3;
+  --color-ink: #20271f;
+  --color-ink-soft: #3a443b;
+  --color-muted: #646d63;
+  --color-subtle: #868e84;
+
+  /* Brand (sage) */
+  --color-brand: #294435;
+  --color-brand-hover: #365642;
+  --color-brand-soft: #e8efe6;
+  --color-brand-ring: #c6d6c5;
+  --color-brand-text: #3f5f47;
+
+  /* Accent (amber) — attention, never danger */
+  --color-accent: #d9a352;
+  --color-accent-soft: #fcf7ec;
+  --color-accent-line: #ecdcc0;
+  --color-accent-ink: #6e5934;
+
+  /* Feedback */
+  --color-success-soft: #f2f8f0;
+  --color-success-line: #d5e4d3;
+  --color-success-ink: #3f5c45;
+  --color-danger: #93645a;
+  --color-danger-soft: #fcf5f3;
+  --color-danger-line: #ebd6d0;
+  --color-danger-ink: #8a4c43;
+
+  /* Shape */
+  --shadow-card: 0 1px 2px rgb(32 39 31 / 0.04), 0 12px 32px rgb(41 68 53 / 0.06);
+  --shadow-raised: 0 1px 2px rgb(32 39 31 / 0.05), 0 22px 60px rgb(41 68 53 / 0.1);
+
+  /* Motion */
+  --animate-enter: enter 280ms ease-out both;
+  --animate-breathe: breathe 3s ease-in-out infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.74;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+  }
 }
 
 @theme inline {
-  --color-background: var(--paper);
-  --color-foreground: var(--ink);
-  --font-sans: var(--font-geist-sans);
-  --font-display: var(--font-manrope);
-}
-
-* {
-  box-sizing: border-box;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-geist-sans), ui-sans-serif, sans-serif;
 }
 
 html {
-  background: var(--paper);
+  background: var(--color-canvas);
 }
 
 body {
   min-width: 320px;
   background:
-    radial-gradient(circle at 77% -18%, rgba(209, 223, 207, 0.72), transparent 31rem),
-    var(--paper);
-  color: var(--ink);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
-}
-
-button,
-textarea {
-  font: inherit;
+    radial-gradient(circle at 77% -18%, rgb(209 223 207 / 0.72), transparent 31rem),
+    var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
 
 button {
@@ -46,39 +96,8 @@ button {
 }
 
 ::selection {
-  background: #ccddc8;
-  color: var(--sage-dark);
-}
-
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.74;
-  }
-  50% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-}
-
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-breathe {
-  animation: breathe 3s ease-in-out infinite;
-}
-
-.animate-enter {
-  animation: enter 280ms ease-out both;
+  background: var(--color-brand-ring);
+  color: var(--color-brand);
 }
 
 @media (prefers-reduced-motion: reduce) {

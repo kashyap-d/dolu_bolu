@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { validateProposalEvidence } from "@/features/assistant/validate-job-drive-proposal";
+import { validateProposalEvidence } from "@/features/assistant/validate-proposal";
 import {
   AiProviderError,
   type ActionProposalInput,
@@ -46,7 +46,7 @@ const fixtureSchema = z.array(
       expected: z
         .object({
           decisionKind: z.enum([
-            "proposals",
+            "proposal",
             "needs_clarification",
             "unsupported",
           ]),
@@ -96,8 +96,8 @@ async function main() {
       );
     }
 
-    if (result.decision.kind === "proposals") {
-      const proposal = result.decision.proposals[0];
+    if (result.decision.kind === "proposal") {
+      const proposal = result.decision.proposal;
 
       if (proposal?.kind !== "record_job_drive_progress") {
         failures.push("expected one record_job_drive_progress proposal");

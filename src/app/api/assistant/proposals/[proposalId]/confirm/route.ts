@@ -2,50 +2,24 @@ import {
   confirmJobDriveRequestSchema,
   confirmJobDriveResponseSchema,
 } from "@/features/job-drives/contracts";
-import { getRequestAuth } from "@/server/auth/session";
-import {
-  confirmJobDriveProposal,
-  JobDriveProposalRepositoryError,
-} from "@/server/repositories/job-drive-proposal-repository";
+import { authenticatedJsonRoute, jsonError, parseId, unauthenticated } from "@/server/http";
+import { confirmProposal } from "@/server/repositories/proposal-repository";
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ proposalId: string }> },
-) {
-  const auth = await getRequestAuth();
-  if (!auth) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
-  }
+export const POST = authenticatedJsonRoute(
+  {
+    schema: confirmJobDriveRequestSchema,
+    invalidMessage: "Please correct the Job Drive fields.",
+    unavailableMessage: "Confirmation is temporarily unavailable.",
+  },
+  async ({ auth, body }, context: { params: Promise<{ proposalId: string }> }) => {
+    const proposalId = parseId((await context.params).proposalId);
+    if (!proposalId) return jsonError(404, "Proposal not found.");
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
-  }
-
-  const parsed = confirmJobDriveRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return Response.json(
-      {
-        error: "Please correct the Job Drive fields.",
-        issues: parsed.error.issues.map((issue) => ({
-          path: issue.path.join("."),
-          message: issue.message,
-        })),
-      },
-      { status: 400 },
-    );
-  }
-
-  const { proposalId } = await context.params;
-
-  try {
-    const result = await confirmJobDriveProposal(auth.supabase, {
+    const result = await confirmProposal(auth.supabase, {
       proposalId,
-      version: parsed.data.version,
-      drive: parsed.data.drive,
-      allowPossibleDuplicate: parsed.data.allowPossibleDuplicate,
+      version: body.version,
+      drive: body.drive,
+      allowPossibleDuplicate: body.allowPossibleDuplicate,
     });
 
     switch (result.outcome) {
@@ -55,27 +29,15 @@ export async function POST(
       case "possible_duplicate":
         return Response.json(result, { status: 409 });
       case "auth_required":
-        return Response.json({ error: "Authentication required." }, { status: 401 });
+        return unauthenticated();
       case "not_found":
-        return Response.json({ error: "Proposal not found." }, { status: 404 });
+        return jsonError(404, "Proposal not found.");
       case "conflict":
-        return Response.json(
-          { error: "This proposal has changed or is no longer pending." },
-          { status: 409 },
-        );
+        return jsonError(409, "This proposal has changed or is no longer pending.", {
+          recovery: "Refresh to load the latest proposal.",
+        });
       case "invalid_payload":
-        return Response.json(
-          { error: "The Job Drive payload could not be confirmed safely." },
-          { status: 422 },
-        );
+        return jsonError(422, "The Job Drive payload could not be confirmed safely.");
     }
-  } catch (error) {
-    if (error instanceof JobDriveProposalRepositoryError) {
-      return Response.json(
-        { error: "Confirmation is temporarily unavailable. Please try again." },
-        { status: 503 },
-      );
-    }
-    throw error;
-  }
-}
+  },
+);

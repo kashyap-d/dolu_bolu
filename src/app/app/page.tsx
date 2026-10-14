@@ -1,31 +1,20 @@
-import { JobDriveCommandCenter } from "@/features/assistant/components/job-drive-command-center";
+import { CommandCenterView } from "@/features/assistant/components/command-center";
 import { requirePageAuth } from "@/server/auth/session";
-import { listPendingJobDriveProposals } from "@/server/repositories/job-drive-proposal-repository";
 import { listJobDrives } from "@/server/repositories/job-drive-repository";
+import { listPendingProposals } from "@/server/repositories/proposal-repository";
 
-export default async function WorkspacePage() {
+export default async function CommandCenterPage() {
   const { principal, supabase } = await requirePageAuth();
-  let proposals = [] as Awaited<ReturnType<typeof listPendingJobDriveProposals>>;
-  let jobDrives = [] as Awaited<ReturnType<typeof listJobDrives>>;
-  let loadError: string | null = null;
-
-  try {
-    [proposals, jobDrives] = await Promise.all([
-      listPendingJobDriveProposals(supabase, principal.id),
-      listJobDrives(supabase, principal.id),
-    ]);
-  } catch {
-    loadError =
-      "Your workspace could not be loaded. Make sure the Supabase migrations are applied, then refresh this page.";
-  }
+  const [proposals, drives] = await Promise.all([
+    listPendingProposals(supabase, principal.id),
+    listJobDrives(supabase, principal.id),
+  ]);
 
   return (
-    <JobDriveCommandCenter
-      initialJobDrives={jobDrives}
-      initialProposals={proposals}
-      loadError={loadError}
-      mode="persistent"
-      viewer={principal}
+    <CommandCenterView
+      drives={drives}
+      greetingName={principal.displayName?.split(/\s+/)[0] ?? null}
+      proposals={proposals}
     />
   );
 }

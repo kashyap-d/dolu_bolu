@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ProviderDecision } from "@/features/assistant/job-drive-contracts";
+import type { ProviderDecision } from "@/features/assistant/contracts";
 
 export interface ActionProposalInput {
   message: string;

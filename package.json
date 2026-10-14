@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit --incremental false",
+    "typecheck": "next typegen && tsc --noEmit --incremental false",
     "test": "node --conditions=react-server --import tsx --test tests/**/*.test.ts",
     "test:watch": "node --conditions=react-server --import tsx --test --watch tests/**/*.test.ts",
     "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts"

@@ -3,6 +3,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { RepositoryError } from "@/server/repositories/errors";
+
 const consumeResultSchema = z.discriminatedUnion("outcome", [
   z.object({
     outcome: z.literal("allowed"),
@@ -16,13 +18,6 @@ const consumeResultSchema = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.enum(["auth_required", "invalid_limit"]) }),
 ]);
 
-export class AiUsageRepositoryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AiUsageRepositoryError";
-  }
-}
-
 export async function consumeAiRequest(
   supabase: SupabaseClient,
   dailyLimit: number,
@@ -31,11 +26,11 @@ export async function consumeAiRequest(
     p_daily_limit: dailyLimit,
   });
   if (error) {
-    throw new AiUsageRepositoryError("Could not reserve an AI request.");
+    throw new RepositoryError("Could not reserve an AI request.");
   }
   const parsed = consumeResultSchema.safeParse(data);
   if (!parsed.success) {
-    throw new AiUsageRepositoryError("AI usage returned invalid data.");
+    throw new RepositoryError("AI usage returned invalid data.");
   }
   return parsed.data;
 }

@@ -7,17 +7,17 @@ import {
   actionProposalSchema,
   type ActionProposal,
   type ActionProposalDraft,
-} from "@/features/assistant/job-drive-contracts";
+} from "@/features/assistant/contracts";
 import {
   confirmJobDriveResponseSchema,
   type JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
+import { RepositoryError } from "@/server/repositories/errors";
 
 const persistedProposalRowSchema = z.object({
   batch_id: z.uuid(),
   proposal_id: z.uuid(),
   proposal_version: z.number().int().positive(),
-  action_ref: z.string(),
   proposal_summary: z.string(),
   proposal_payload: z.unknown(),
   proposal_evidence: z.unknown(),
@@ -27,7 +27,6 @@ const persistedProposalRowSchema = z.object({
 const storedProposalRowSchema = z.object({
   id: z.uuid(),
   batch_id: z.uuid(),
-  action_ref: z.string(),
   kind: z.literal("record_job_drive_progress"),
   version: z.number().int().positive(),
   status: z.enum(["pending", "executing", "executed", "rejected", "failed", "expired"]),
@@ -66,20 +65,12 @@ const rejectionRpcSchema = z.object({
   ]),
 });
 
-export class JobDriveProposalRepositoryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "JobDriveProposalRepositoryError";
-  }
-}
-
 function proposalFromPersistedRow(
   row: z.infer<typeof persistedProposalRowSchema>,
 ) {
   return actionProposalSchema.parse({
     id: row.proposal_id,
     version: row.proposal_version,
-    ref: row.action_ref,
     kind: "record_job_drive_progress",
     summary: row.proposal_summary,
     payload: row.proposal_payload,
@@ -92,7 +83,6 @@ function proposalFromStoredRow(row: z.infer<typeof storedProposalRowSchema>) {
   return actionProposalSchema.parse({
     id: row.id,
     version: row.version,
-    ref: row.action_ref,
     kind: row.kind,
     summary: row.summary,
     payload: row.payload,
@@ -101,7 +91,7 @@ function proposalFromStoredRow(row: z.infer<typeof storedProposalRowSchema>) {
   });
 }
 
-export async function findJobDriveProposalByClientRequest(
+export async function findProposalByClientRequest(
   supabase: SupabaseClient,
   userId: string,
   clientRequestId: string,
@@ -114,14 +104,14 @@ export async function findJobDriveProposalByClientRequest(
     .maybeSingle();
 
   if (batchError) {
-    throw new JobDriveProposalRepositoryError("Could not read proposal batch.");
+    throw new RepositoryError("Could not read proposal batch.");
   }
   if (!batchData) return null;
 
   const batch = storedBatchSchema.parse(batchData);
   const { data, error } = await supabase
     .from("action_proposals")
-    .select("id, batch_id, action_ref, kind, version, status, summary, payload, evidence, assumptions")
+    .select("id, batch_id, kind, version, status, summary, payload, evidence, assumptions")
     .eq("user_id", userId)
     .eq("batch_id", batch.id)
     .eq("kind", "record_job_drive_progress")
@@ -129,13 +119,13 @@ export async function findJobDriveProposalByClientRequest(
     .maybeSingle();
 
   if (error || !data) {
-    throw new JobDriveProposalRepositoryError("Could not read persisted proposal.");
+    throw new RepositoryError("Could not read persisted proposal.");
   }
   const proposal = storedProposalRowSchema.parse(data);
   return { batch, proposal: proposalFromStoredRow(proposal), status: proposal.status };
 }
 
-export async function persistJobDriveProposal(
+export async function persistProposal(
   supabase: SupabaseClient,
   input: {
     clientRequestId: string;
@@ -155,7 +145,8 @@ export async function persistJobDriveProposal(
     p_source_message: input.sourceMessage,
     p_provider: input.provider,
     p_model: input.model,
-    p_action_ref: input.proposal.ref,
+    // One proposal per message (docs/decisions/0008); the column remains for idempotency keys.
+    p_action_ref: "draft:1",
     p_summary: input.proposal.summary,
     p_payload: input.payload,
     p_evidence: input.proposal.evidence,
@@ -163,25 +154,22 @@ export async function persistJobDriveProposal(
   });
 
   if (error) {
-    throw new JobDriveProposalRepositoryError("Could not persist proposal.");
+    throw new RepositoryError("Could not persist proposal.");
   }
   const parsed = z.array(persistedProposalRowSchema).length(1).safeParse(data);
   if (!parsed.success) {
-    throw new JobDriveProposalRepositoryError("Proposal persistence returned invalid data.");
+    throw new RepositoryError("Proposal persistence returned invalid data.");
   }
-  return {
-    batchId: parsed.data[0].batch_id,
-    proposal: proposalFromPersistedRow(parsed.data[0]),
-  };
+  return proposalFromPersistedRow(parsed.data[0]);
 }
 
-export async function listPendingJobDriveProposals(
+export async function listPendingProposals(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ActionProposal[]> {
   const { data, error } = await supabase
     .from("action_proposals")
-    .select("id, batch_id, action_ref, kind, version, status, summary, payload, evidence, assumptions")
+    .select("id, batch_id, kind, version, status, summary, payload, evidence, assumptions")
     .eq("user_id", userId)
     .eq("kind", "record_job_drive_progress")
     .eq("status", "pending")
@@ -189,16 +177,16 @@ export async function listPendingJobDriveProposals(
     .limit(5);
 
   if (error) {
-    throw new JobDriveProposalRepositoryError("Could not load pending proposals.");
+    throw new RepositoryError("Could not load pending proposals.");
   }
   const parsed = z.array(storedProposalRowSchema).safeParse(data);
   if (!parsed.success) {
-    throw new JobDriveProposalRepositoryError("Stored proposal data is invalid.");
+    throw new RepositoryError("Stored proposal data is invalid.");
   }
   return parsed.data.map(proposalFromStoredRow);
 }
 
-export async function confirmJobDriveProposal(
+export async function confirmProposal(
   supabase: SupabaseClient,
   input: {
     proposalId: string;
@@ -214,12 +202,12 @@ export async function confirmJobDriveProposal(
     p_allow_possible_duplicate: input.allowPossibleDuplicate,
   });
   if (error) {
-    throw new JobDriveProposalRepositoryError("Could not confirm proposal.");
+    throw new RepositoryError("Could not confirm proposal.");
   }
   return confirmationRpcSchema.parse(data);
 }
 
-export async function rejectJobDriveProposal(
+export async function rejectProposal(
   supabase: SupabaseClient,
   input: { proposalId: string; version: number },
 ) {
@@ -228,7 +216,7 @@ export async function rejectJobDriveProposal(
     p_expected_version: input.version,
   });
   if (error) {
-    throw new JobDriveProposalRepositoryError("Could not reject proposal.");
+    throw new RepositoryError("Could not reject proposal.");
   }
   return rejectionRpcSchema.parse(data);
 }

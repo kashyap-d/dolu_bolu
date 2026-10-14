@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { actionProposalDraftSchema, actionProposalSchema, type ActionProposalDraft } from "../src/features/assistant/job-drive-contracts";
-import { validateProposalEvidence, validateProposalForConfirmation } from "../src/features/assistant/validate-job-drive-proposal";
+import { actionProposalDraftSchema, actionProposalSchema, type ActionProposalDraft } from "../src/features/assistant/contracts";
+import { validateProposalEvidence, validateProposalForConfirmation } from "../src/features/assistant/validate-proposal";
 
 function draft(): ActionProposalDraft {
   return {
-    ref: "draft:1",
     kind: "record_job_drive_progress",
     summary: "Move Acme · Backend Engineer to Assessment",
     evidence: [{ fieldPath: "companyName", quote: "Acme" }],

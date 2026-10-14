@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { providerDecisionSchema } from "@/features/assistant/job-drive-contracts";
+import { providerDecisionSchema } from "@/features/assistant/contracts";
 import { getGeminiEnvironment } from "@/server/env";
 
 import {
@@ -20,134 +20,127 @@ const responseSchema = {
       type: "object",
       additionalProperties: false,
       properties: {
-        kind: { type: "string", enum: ["proposals"] },
-        proposals: {
-          type: "array",
-          minItems: 1,
-          maxItems: 1,
-          items: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              ref: { type: "string", enum: ["draft:1"] },
-              kind: { type: "string", enum: ["record_job_drive_progress"] },
-              summary: {
-                type: "string",
-                description: "A concise description under 180 characters.",
-              },
-              evidence: {
-                type: "array",
-                minItems: 2,
-                maxItems: 8,
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    fieldPath: { type: "string" },
-                    quote: {
-                      type: "string",
-                      description:
-                        "An exact, case-sensitive substring copied from the source message.",
-                    },
-                  },
-                  required: ["fieldPath", "quote"],
-                },
-              },
-              assumptions: {
-                type: "array",
-                maxItems: 8,
-                items: { type: "string" },
-              },
-              payload: {
+        kind: { type: "string", enum: ["proposal"] },
+        proposal: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            kind: { type: "string", enum: ["record_job_drive_progress"] },
+            summary: {
+              type: "string",
+              description: "A concise description under 180 characters.",
+            },
+            evidence: {
+              type: "array",
+              minItems: 2,
+              maxItems: 8,
+              items: {
                 type: "object",
                 additionalProperties: false,
                 properties: {
-                  jobDriveRef: { type: ["string", "null"] },
-                  isCorrection: { type: "boolean" },
-                  companyName: { type: ["string", "null"] },
-                  roleTitle: { type: ["string", "null"] },
-                  stage: {
+                  fieldPath: { type: "string" },
+                  quote: {
                     type: "string",
-                    enum: [
-                      "planned",
-                      "applied",
-                      "assessment",
-                      "interview",
-                      "offer",
-                      "accepted",
-                      "rejected",
-                      "withdrawn",
-                    ],
-                  },
-                  stageOccurredAt: { type: ["string", "null"], format: "date-time" },
-                  appliedAt: {
-                    type: ["string", "null"],
-                    format: "date-time",
-                  },
-                  applyBy: { type: ["string", "null"], format: "date-time" },
-                  location: { type: ["string", "null"] },
-                  sourceUrl: { type: ["string", "null"] },
-                  notes: { type: ["string", "null"] },
-                  assessment: {
-                    type: ["object", "null"],
-                    additionalProperties: false,
-                    properties: {
-                      status: {
-                        type: "string",
-                        enum: ["invited", "scheduled", "completed", "passed", "failed", "cancelled"],
-                      },
-                      availableFrom: { type: ["string", "null"], format: "date-time" },
-                      dueAt: { type: ["string", "null"], format: "date-time" },
-                      durationMinutes: { type: ["integer", "null"], minimum: 1, maximum: 1440 },
-                      assessmentUrl: { type: ["string", "null"] },
-                      notes: { type: ["string", "null"] },
-                    },
-                    required: ["status", "availableFrom", "dueAt", "durationMinutes", "assessmentUrl", "notes"],
-                  },
-                  interview: {
-                    type: ["object", "null"],
-                    additionalProperties: false,
-                    properties: {
-                      nextScheduledAt: { type: ["string", "null"], format: "date-time" },
-                      timeZone: { type: ["string", "null"] },
-                      mode: { type: "string", enum: ["virtual", "phone", "onsite", "unknown"] },
-                      location: { type: ["string", "null"] },
-                      meetingUrl: { type: ["string", "null"] },
-                      roundSummary: { type: ["string", "null"] },
-                      notes: { type: ["string", "null"] },
-                    },
-                    required: ["nextScheduledAt", "timeZone", "mode", "location", "meetingUrl", "roundSummary", "notes"],
+                    description:
+                      "An exact, case-sensitive substring copied from the source message.",
                   },
                 },
-                required: [
-                  "jobDriveRef",
-                  "isCorrection",
-                  "companyName",
-                  "roleTitle",
-                  "stage",
-                  "stageOccurredAt",
-                  "appliedAt",
-                  "applyBy",
-                  "location",
-                  "sourceUrl",
-                  "notes",
-                  "assessment",
-                  "interview",
-                ],
+                required: ["fieldPath", "quote"],
               },
             },
-            required: [
-              "ref",
-              "kind",
-              "summary",
-              "evidence",
-              "assumptions",
-              "payload",
-            ],
+            assumptions: {
+              type: "array",
+              maxItems: 8,
+              items: { type: "string" },
+            },
+            payload: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                jobDriveRef: { type: ["string", "null"] },
+                isCorrection: { type: "boolean" },
+                companyName: { type: ["string", "null"] },
+                roleTitle: { type: ["string", "null"] },
+                stage: {
+                  type: "string",
+                  enum: [
+                    "planned",
+                    "applied",
+                    "assessment",
+                    "interview",
+                    "offer",
+                    "accepted",
+                    "rejected",
+                    "withdrawn",
+                  ],
+                },
+                stageOccurredAt: { type: ["string", "null"], format: "date-time" },
+                appliedAt: {
+                  type: ["string", "null"],
+                  format: "date-time",
+                },
+                applyBy: { type: ["string", "null"], format: "date-time" },
+                location: { type: ["string", "null"] },
+                sourceUrl: { type: ["string", "null"] },
+                notes: { type: ["string", "null"] },
+                assessment: {
+                  type: ["object", "null"],
+                  additionalProperties: false,
+                  properties: {
+                    status: {
+                      type: "string",
+                      enum: ["invited", "scheduled", "completed", "passed", "failed", "cancelled"],
+                    },
+                    availableFrom: { type: ["string", "null"], format: "date-time" },
+                    dueAt: { type: ["string", "null"], format: "date-time" },
+                    durationMinutes: { type: ["integer", "null"], minimum: 1, maximum: 1440 },
+                    assessmentUrl: { type: ["string", "null"] },
+                    notes: { type: ["string", "null"] },
+                  },
+                  required: ["status", "availableFrom", "dueAt", "durationMinutes", "assessmentUrl", "notes"],
+                },
+                interview: {
+                  type: ["object", "null"],
+                  additionalProperties: false,
+                  properties: {
+                    nextScheduledAt: { type: ["string", "null"], format: "date-time" },
+                    timeZone: { type: ["string", "null"] },
+                    mode: { type: "string", enum: ["virtual", "phone", "onsite", "unknown"] },
+                    location: { type: ["string", "null"] },
+                    meetingUrl: { type: ["string", "null"] },
+                    roundSummary: { type: ["string", "null"] },
+                    notes: { type: ["string", "null"] },
+                  },
+                  required: ["nextScheduledAt", "timeZone", "mode", "location", "meetingUrl", "roundSummary", "notes"],
+                },
+              },
+              required: [
+                "jobDriveRef",
+                "isCorrection",
+                "companyName",
+                "roleTitle",
+                "stage",
+                "stageOccurredAt",
+                "appliedAt",
+                "applyBy",
+                "location",
+                "sourceUrl",
+                "notes",
+                "assessment",
+                "interview",
+              ],
+            },
           },
+          required: [
+            "kind",
+            "summary",
+            "evidence",
+            "assumptions",
+            "payload",
+          ],
         },
       },
-      required: ["kind", "proposals"],
+      required: ["kind", "proposal"],
     },
     {
       type: "object",
