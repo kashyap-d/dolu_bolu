@@ -17,7 +17,6 @@
   --color-foreground: var(--ink);
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-manrope);
-  --font-mono: var(--font-geist-mono);
 }
 
 * {
