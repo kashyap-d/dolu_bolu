@@ -58,7 +58,7 @@ The Job Drive foundation is implemented in code as of September 2026:
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 - With no Supabase environment, `/` offers an explicitly temporary local preview. With Supabase configured, `/` redirects to `/app`.
 
-Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order—including `20260916000000_job_drive_foundation.sql`—configure OAuth redirect URLs, and run all quality gates with the selected provider.
+Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order—including `20260916000000_job_drive_foundation.sql` and `20261014000000_ai_quota_and_legacy_cleanup.sql`—configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
 ## Explicit non-goals for V1
 
@@ -76,6 +76,7 @@ Before calling the hosted slice operational, apply every migration in `supabase/
 - Every mutation is performed by deterministic, allowlisted application code after explicit user confirmation.
 - Treat every route handler and server action as a public endpoint. Re-authenticate, authorize ownership, and validate input inside the trusted server boundary.
 - Confirmation is idempotent. A repeated request must return the original result and never create duplicate records.
+- Hosted AI calls require an authenticated user and a reserved daily allowance; the unauthenticated preview only uses the deterministic provider.
 - Never silently send user data to a fallback AI vendor. Provider changes are explicit configuration choices.
 - Send only bounded, relevant context to a model. Never send an entire job-search history when a small matching subset is sufficient.
 - Unknown information stays unknown. Ask for clarification instead of inventing companies, roles, dates, times, or entity links.
@@ -110,6 +111,7 @@ Keep these responsibilities separate:
 - `src/server/supabase`: cookie-bound server client utilities.
 - `src/lib`: small shared utilities that contain no privileged data access.
 - `supabase/migrations`: the reproducible database source of truth.
+- `docs/decisions`: architecture decision records. Read the relevant record before changing a decided area, and add a superseding record instead of contradicting one silently.
 - `tests`: unit and integration coverage; sanitized AI evaluation fixtures belong under `evals` when introduced.
 
 Browser components must not import server modules, provider SDKs, database credentials, or service-role clients. Route handlers should parse the request, call a server service, and return the smallest DTO the UI needs.
@@ -126,7 +128,7 @@ If an action lacks information required for safe execution, return a clarificati
 
 ## Data model direction
 
-Core owner-scoped tables are `profiles`, `job_drives`, `job_drive_assessments`, `interviews`, `proposal_batches`, `action_proposals`, and `activity_events`. The legacy `tasks` table remains in the migration history but task workflows are deferred.
+Core owner-scoped tables are `profiles`, `job_drives`, `job_drive_assessments`, `interviews`, `proposal_batches`, `action_proposals`, `activity_events`, and `ai_usage_daily` (per-user daily hosted-AI allowance). The legacy `tasks` table remains in the migration history but task workflows are deferred.
 
 Store timestamps as `timestamptz`; unknown dates stay null. Assessments and interviews belong to a drive and use composite owner FKs. The interview table remains capable of multiple rounds, while v1 reads/edits the latest row as one consolidated phase. Future Calendar integration must use separate OAuth consent from sign-in and per-event approval.
 

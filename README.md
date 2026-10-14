@@ -45,9 +45,9 @@ Google sign-in
 - Owner-scoped Row Level Security with direct client mutation revoked for Job Drives, assessments, interviews, proposals, and activity history.
 - Unknown dates remain optional: an OA may imply application progress without inventing an application date.
 - A reload-safe drive workspace plus local demo mode when Supabase is not configured.
-- 61 unit/contract/migration tests and a 14-case live provider evaluation covering the Job Drive contract.
+- Unit/contract/migration tests and a 14-case live provider evaluation covering the Job Drive contract.
 - A completed hosted acceptance pass covering AI create/update, manual stage changes, OA/interview persistence, duplicate resolution, explicit correction, reload persistence, legacy activity compatibility, and keyboard stage interaction.
-- Repository-wide product guidance in `AGENTS.md` and an implementation trace in [`JOB_DRIVE_WORKFLOW.md`](JOB_DRIVE_WORKFLOW.md).
+- Repository-wide product guidance in `AGENTS.md` and an implementation trace in [`WORKFLOW.md`](WORKFLOW.md). Significant technical choices are recorded in [`docs/decisions`](docs/decisions/README.md).
 
 ### Engineering decisions worth discussing
 
@@ -88,7 +88,7 @@ When valid Supabase values are present, `/` redirects to the authenticated works
 
 1. Create a Supabase project and copy `.env.example` to `.env.local`.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` to the project base URL (for example, `https://<project-ref>.supabase.co`) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the public publishable key. Do not include `/rest/v1` in the URL.
-3. Apply every SQL file in `supabase/migrations` in filename order, including `20260916000000_job_drive_foundation.sql`. They are the database source of truth; connecting a GitHub repository does not by itself run them against an existing project.
+3. Apply every SQL file in `supabase/migrations` in filename order, including `20260916000000_job_drive_foundation.sql` and `20261014000000_ai_quota_and_legacy_cleanup.sql`. They are the database source of truth; connecting a GitHub repository does not by itself run them against an existing project.
 4. In Supabase Authentication, enable Google and add the Google OAuth client ID and secret.
 5. In the Google Cloud OAuth web client, add Supabase's callback URL:
 
