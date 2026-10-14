@@ -21,11 +21,20 @@ import {
 import { inferredStage } from "@/features/job-drives/stage-rules";
 import { matchingJobDrives } from "@/features/job-drives/matching";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
+import { getAiDailyRequestLimit } from "@/server/env";
+import { consumeAiRequest } from "@/server/repositories/ai-usage-repository";
 import { listJobDrives } from "@/server/repositories/job-drive-repository";
 import {
   findJobDriveProposalByClientRequest,
   persistJobDriveProposal,
 } from "@/server/repositories/job-drive-proposal-repository";
+
+export class AiQuotaExceededError extends Error {
+  constructor(readonly limit: number) {
+    super("The daily assistant limit has been reached.");
+    this.name = "AiQuotaExceededError";
+  }
+}
 
 export class ClientRequestConflictError extends Error {
   constructor() {
@@ -189,7 +198,19 @@ export async function prepareJobDriveProposals(
   const drives = persistence
     ? await listJobDrives(persistence.supabase, persistence.userId)
     : [];
-  const provider = getActionProposalProvider();
+  const provider = getActionProposalProvider({ allowHosted: Boolean(persistence) });
+  if (persistence && !provider.isDemo) {
+    const usage = await consumeAiRequest(
+      persistence.supabase,
+      getAiDailyRequestLimit(),
+    );
+    if (usage.outcome === "limit_reached") {
+      throw new AiQuotaExceededError(usage.limit);
+    }
+    if (usage.outcome !== "allowed") {
+      throw new Error("The AI request allowance could not be reserved.");
+    }
+  }
   const rawResult = await provider.propose({
     message: request.message,
     now: new Date().toISOString(),

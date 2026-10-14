@@ -3,6 +3,7 @@ import { AiProviderError } from "@/server/ai/action-proposal-provider";
 import { getRequestAuth } from "@/server/auth/session";
 import { isSupabaseConfigured } from "@/server/env";
 import {
+  AiQuotaExceededError,
   ClientRequestConflictError,
   prepareJobDriveProposals,
 } from "@/server/services/job-drive-proposal-service";
@@ -55,6 +56,16 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ClientRequestConflictError) {
       return Response.json({ error: error.message }, { status: 409 });
+    }
+
+    if (error instanceof AiQuotaExceededError) {
+      return Response.json(
+        {
+          error: `You've used today's ${error.limit} assistant requests.`,
+          recovery: "Your message is still in the composer. Add the update manually or try again tomorrow.",
+        },
+        { status: 429 },
+      );
     }
 
     if (error instanceof AiProviderError) {

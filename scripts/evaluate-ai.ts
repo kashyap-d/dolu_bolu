@@ -77,7 +77,7 @@ async function main() {
     ? allFixtures.filter((fixture) => fixture.id === selectedCase)
     : allFixtures;
   if (fixtures.length === 0) throw new Error(`Unknown evaluation case: ${selectedCase}`);
-  const provider = getActionProposalProvider();
+  const provider = getActionProposalProvider({ allowHosted: true });
   let passed = 0;
 
   for (const fixture of fixtures) {

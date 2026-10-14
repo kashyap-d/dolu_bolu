@@ -67,6 +67,25 @@ export function getAiProviderName() {
   return parsed.data;
 }
 
+const aiDailyRequestLimitSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(1_000)
+  .default(50);
+
+export function getAiDailyRequestLimit() {
+  const parsed = aiDailyRequestLimitSchema.safeParse(
+    process.env.AI_DAILY_REQUEST_LIMIT || undefined,
+  );
+
+  if (!parsed.success) {
+    throw new Error("AI_DAILY_REQUEST_LIMIT must be an integer from 1 to 1000.");
+  }
+
+  return parsed.data;
+}
+
 export function getGeminiEnvironment() {
   const parsed = geminiEnvironmentSchema.safeParse({
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
