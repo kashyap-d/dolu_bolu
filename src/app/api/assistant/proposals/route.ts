@@ -1,11 +1,11 @@
-import { assistantRequestSchema } from "@/features/assistant/contracts";
+import { assistantRequestSchema } from "@/features/assistant/job-drive-contracts";
 import { AiProviderError } from "@/server/ai/action-proposal-provider";
 import { getRequestAuth } from "@/server/auth/session";
 import { isSupabaseConfigured } from "@/server/env";
 import {
   ClientRequestConflictError,
-  prepareActionProposals,
-} from "@/server/services/proposal-service";
+  prepareJobDriveProposals,
+} from "@/server/services/job-drive-proposal-service";
 
 export async function POST(request: Request) {
   const persistenceEnabled = isSupabaseConfigured();
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await prepareActionProposals(
+    const result = await prepareJobDriveProposals(
       parsedRequest.data,
       auth
         ? { supabase: auth.supabase, userId: auth.principal.id }
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
         REFUSED: {
           status: 422,
           error: "The assistant could not safely interpret that message.",
-          recovery: "Try rephrasing it with just the company, role, and date.",
+          recovery: "Try rephrasing it with the company, role, and stage.",
         },
         INVALID_OUTPUT: {
           status: 502,

@@ -1,9 +1,12 @@
-import { confirmApplicationRequestSchema } from "@/features/applications/contracts";
+import {
+  confirmJobDriveRequestSchema,
+  confirmJobDriveResponseSchema,
+} from "@/features/job-drives/contracts";
 import { getRequestAuth } from "@/server/auth/session";
 import {
-  confirmApplicationProposal,
-  ProposalRepositoryError,
-} from "@/server/repositories/proposal-repository";
+  confirmJobDriveProposal,
+  JobDriveProposalRepositoryError,
+} from "@/server/repositories/job-drive-proposal-repository";
 
 export async function POST(
   request: Request,
@@ -21,11 +24,11 @@ export async function POST(
     return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
   }
 
-  const parsed = confirmApplicationRequestSchema.safeParse(body);
+  const parsed = confirmJobDriveRequestSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
       {
-        error: "Please correct the application fields.",
+        error: "Please correct the Job Drive fields.",
         issues: parsed.error.issues.map((issue) => ({
           path: issue.path.join("."),
           message: issue.message,
@@ -38,16 +41,19 @@ export async function POST(
   const { proposalId } = await context.params;
 
   try {
-    const result = await confirmApplicationProposal(auth.supabase, {
+    const result = await confirmJobDriveProposal(auth.supabase, {
       proposalId,
       version: parsed.data.version,
-      application: parsed.data.application,
+      drive: parsed.data.drive,
+      allowPossibleDuplicate: parsed.data.allowPossibleDuplicate,
     });
 
     switch (result.outcome) {
       case "executed":
       case "already_executed":
-        return Response.json(result);
+        return Response.json(confirmJobDriveResponseSchema.parse(result));
+      case "possible_duplicate":
+        return Response.json(result, { status: 409 });
       case "auth_required":
         return Response.json({ error: "Authentication required." }, { status: 401 });
       case "not_found":
@@ -59,12 +65,12 @@ export async function POST(
         );
       case "invalid_payload":
         return Response.json(
-          { error: "The application payload could not be confirmed safely." },
+          { error: "The Job Drive payload could not be confirmed safely." },
           { status: 422 },
         );
     }
   } catch (error) {
-    if (error instanceof ProposalRepositoryError) {
+    if (error instanceof JobDriveProposalRepositoryError) {
       return Response.json(
         { error: "Confirmation is temporarily unavailable. Please try again." },
         { status: 503 },

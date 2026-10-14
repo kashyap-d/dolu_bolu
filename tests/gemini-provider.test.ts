@@ -19,7 +19,7 @@ const input = {
   now: "2026-09-15T12:00:00.000Z",
   timeZone: "Asia/Kolkata",
   locale: "en-IN",
-  context: { applications: [] },
+  context: { jobDrives: [] },
 };
 
 function successfulResponse() {
@@ -35,20 +35,27 @@ function successfulResponse() {
                   proposals: [
                     {
                       ref: "draft:1",
-                      kind: "create_application",
-                      summary: "Record Frontend Engineer application at Acme",
+                      kind: "record_job_drive_progress",
+                      summary: "Move Acme · Frontend Engineer to Applied",
                       evidence: [
                         { fieldPath: "companyName", quote: "Acme" },
                         { fieldPath: "roleTitle", quote: "Frontend Engineer" },
                       ],
                       assumptions: ["Yesterday was resolved using the supplied time."],
                       payload: {
+                        jobDriveRef: null,
+                        isCorrection: false,
                         companyName: "Acme",
                         roleTitle: "Frontend Engineer",
-                        status: "applied",
+                        stage: "applied",
+                        stageOccurredAt: "2026-09-14T12:00:00.000Z",
                         appliedAt: "2026-09-14T12:00:00.000Z",
+                        applyBy: null,
+                        location: null,
                         sourceUrl: null,
                         notes: null,
+                        assessment: null,
+                        interview: null,
                       },
                     },
                   ],

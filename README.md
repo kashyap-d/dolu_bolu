@@ -1,8 +1,8 @@
 # dolu bolu
 
-dolu bolu is a personal career-operations assistant for job seekers. The current release focuses on application tracking: a user can add and update applications manually, or write a message such as “I applied to Acme yesterday” and review the structured action proposed by the assistant before anything is saved.
+dolu bolu is a personal career-operations assistant for job seekers. The current release tracks each company-and-role hiring process as one **Job Drive**, from planning and application through OA, interview, offer, and final outcome. A user can update a drive manually or describe progress in ordinary language, then review the structured change before anything is saved.
 
-The longer-term product is a trusted workspace for applications, interviews, and follow-ups. It is deliberately not a job marketplace, an autonomous application bot, or a generic chatbot with unrelated AI features.
+The product is deliberately not a job marketplace, an autonomous application bot, or a generic chatbot with unrelated AI features.
 
 ## Why this architecture
 
@@ -21,31 +21,33 @@ This keeps provider choice loosely coupled and makes the trust boundary testable
 
 ## Current project state
 
-The application vertical slice is working end to end:
+The Job Drive foundation is implemented end to end in code:
 
 ```text
 Google sign-in
   -> protected workspace
-  -> manual form or natural-language message
-  -> editable application/proposal
-  -> authenticated database mutation
-  -> reload-safe application list
+  -> manual form or natural-language progress message
+  -> editable Job Drive proposal
+  -> atomic authenticated mutation + activity event
+  -> reload-safe drive list, detail view, and timeline
 ```
 
 ### Implemented
 
 - Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS.
 - Google OAuth through cookie-bound Supabase SSR clients.
-- Protected `/app` and `/app/applications` routes with server-side data loading.
-- A responsive command center with manual application entry and editable AI proposals.
-- Shared schemas for applications, interviews, tasks, and proposal decisions.
+- Protected `/app`, `/app/drives`, and `/app/drives/[driveId]` routes with server-side data loading; old `/app/applications` bookmarks redirect to Drives.
+- A responsive command center, direct Job Drive editor, keyboard/click stage bar, drive list, contextual OA/interview fields, and activity timeline.
+- Shared strict schemas for Job Drives, lifecycle stages, one OA detail record, a consolidated interview phase, activity events, and proposal decisions.
 - A provider interface, a no-key deterministic development adapter, and a server-only Gemini structured-output adapter.
-- Durable pending proposals, atomic/idempotent application confirmation, and rejection through narrow Postgres functions.
-- Deterministic manual application entry with retry-safe client IDs, plus editable lifecycle statuses guarded by optimistic concurrency.
-- Owner-scoped Row Level Security and a server-authored activity event when an AI proposal is confirmed.
-- A reload-safe application list plus local demo mode when Supabase is not configured.
-- Unit and contract tests for proposal validation, provider behavior, application payloads, and environment handling.
-- Repository-wide product and engineering guidance in `AGENTS.md` and a detailed trace of the AI proposal workflow in `WORKFLOW.md`.
+- Durable `record_job_drive_progress` proposals that can match or create a drive, advance its stage, and attach OA or interview details.
+- Atomic, retry-safe manual and AI writes with optimistic concurrency, duplicate warnings, explicit audited corrections, and immutable field-level activity metadata.
+- Owner-scoped Row Level Security with direct client mutation revoked for Job Drives, assessments, interviews, proposals, and activity history.
+- Unknown dates remain optional: an OA may imply application progress without inventing an application date.
+- A reload-safe drive workspace plus local demo mode when Supabase is not configured.
+- 61 unit/contract/migration tests and a 14-case live provider evaluation covering the Job Drive contract.
+- A completed hosted acceptance pass covering AI create/update, manual stage changes, OA/interview persistence, duplicate resolution, explicit correction, reload persistence, legacy activity compatibility, and keyboard stage interaction.
+- Repository-wide product guidance in `AGENTS.md` and an implementation trace in [`JOB_DRIVE_WORKFLOW.md`](JOB_DRIVE_WORKFLOW.md).
 
 ### Engineering decisions worth discussing
 
@@ -54,18 +56,19 @@ Google sign-in
 | The model proposes; deterministic code writes | Prevents unreviewed AI output from mutating user data. |
 | Provider-independent contract | Gemini, a local model, or another hosted model can be compared without rewriting the workflow. |
 | Schema and semantic validation | Treats model output as untrusted input and catches structurally valid but unsafe actions. |
-| Database RPC for proposal confirmation | Makes application creation, proposal completion, and activity recording atomic and retry-safe. |
+| Database RPC for every drive mutation | Makes drive/detail changes and immutable activity recording atomic and retry-safe. |
 | Row Level Security | Enforces ownership in the database instead of relying only on UI or route checks. |
-| Optimistic concurrency for edits | Detects stale updates rather than silently overwriting a newer application state. |
+| Optimistic concurrency for edits | Detects stale updates rather than silently overwriting a newer drive state. |
+| Explicit lifecycle correction | Forward progress is easy; backward moves and reopening terminal drives require an audited correction. |
+| Duplicate warning, not hard uniqueness | Protects users from accidents while permitting legitimate repeat applications. |
 
 ### Current limitations
 
-- Interviews and follow-up tasks have domain schemas, but do not yet have complete persistence and user workflows.
-- Manual application creation and lifecycle edits do not yet write activity events; only confirmed AI-created applications have an audit event.
-- The activity log is not yet visible in the interface.
+- Calendar authorization/synchronization is not implemented yet; dated deadlines and interviews remain inside dolu bolu.
+- The stage-aware JD application brief is intentionally deferred until Calendar readiness.
 - Tests cover contracts and core logic, but there is no automated browser test suite or CI pipeline yet.
 - Provider latency and request IDs are returned, but there is no production observability dashboard or prompt/model regression history.
-- Application lists are intentionally simple and currently lack search, filtering, pagination, and duplicate warnings.
+- The Drives list is capped at the 100 most recently updated records and does not yet expose search/filtering or cursor pagination.
 
 ## Run locally
 
@@ -85,7 +88,7 @@ When valid Supabase values are present, `/` redirects to the authenticated works
 
 1. Create a Supabase project and copy `.env.example` to `.env.local`.
 2. Set `NEXT_PUBLIC_SUPABASE_URL` to the project base URL (for example, `https://<project-ref>.supabase.co`) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the public publishable key. Do not include `/rest/v1` in the URL.
-3. Apply both SQL files in `supabase/migrations` in filename order. They are the database source of truth; connecting a GitHub repository does not by itself guarantee that they have run against an existing project.
+3. Apply every SQL file in `supabase/migrations` in filename order, including `20260916000000_job_drive_foundation.sql`. They are the database source of truth; connecting a GitHub repository does not by itself run them against an existing project.
 4. In Supabase Authentication, enable Google and add the Google OAuth client ID and secret.
 5. In the Google Cloud OAuth web client, add Supabase's callback URL:
 
@@ -117,7 +120,7 @@ Gemini is an explicit alternative to the deterministic demo provider; there is n
 
 4. Restart the development server and test proposal, edit, confirmation, and reload end to end.
 
-The adapter sends only the current message, current time/timezone/locale, and at most 20 recent application labels/statuses. Provider output remains untrusted: Zod and deterministic semantic checks run before a pending proposal can be stored. Verify the selected model's current availability and terms on [Google's Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so do not test with sensitive personal data.
+The adapter sends only the current message, current time/timezone/locale, and at most 20 recent owner-scoped drive summaries. Provider output remains untrusted: Zod and deterministic semantic checks run before a pending proposal can be stored. Verify the selected model's current availability and terms on [Google's Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so do not test with sensitive personal data.
 
 ## Quality checks
 
@@ -139,11 +142,11 @@ The order below deepens the real use case while making each milestone demonstrat
 
 | Phase | Product outcome | Engineering signal |
 | --- | --- | --- |
-| 1. Trustworthy history | Record manual creates and edits atomically, show field-level activity, and warn about likely duplicates. | Transactions, audit design, concurrency, database constraints. |
-| 2. Interview workflow | Capture an interview from text, clarify missing date/timezone data, persist it, and allow edits. | Multi-step agent workflow, temporal validation, reusable domain architecture. |
-| 3. Calendar integration | Create a Google Calendar event only after approval and reconcile retries or later edits. | Scoped OAuth, third-party API integration, idempotency, failure recovery. |
-| 4. Follow-up engine | Suggest and schedule follow-ups from application state while keeping the user in control. | Background jobs, scheduling, retries, notifications, policy-based automation. |
-| 5. Production hardening | Add GitHub Actions, browser-level tests, structured logs, metrics, and a deployed demo. | CI/CD, E2E testing, observability, operational ownership. |
+| 1. Job Drive foundation — complete | The migration and manual/AI create-update flows are verified against hosted Supabase, including audit history, duplicate resolution, correction, and reload persistence. | Data migration, RLS, transactions, concurrency, audit design. |
+| 2. Calendar readiness | Separately authorize Google Calendar and propose per-event sync for deadlines, OA windows, and interviews. | Scoped OAuth, third-party APIs, idempotency, reconciliation. |
+| 3. Evidence-grounded application brief | Map pasted JD requirements to user-supplied experience evidence and identify gaps on demand. | Retrieval, provenance, structured generation, AI evaluation. |
+| 4. Production hardening | Add Playwright acceptance tests, GitHub Actions, structured logs, metrics, and a deployed demo. | CI/CD, E2E testing, observability, operational ownership. |
+| 5. State-aware next actions | Propose a small number of useful follow-ups from actual drive state, always behind approval. | Scheduling, retries, notifications, policy-based automation. |
 
 ## Selective additions that could make the project stand out
 

@@ -14,7 +14,7 @@ This file is the canonical project brief for coding agents.
 
 ## Product vision
 
-dolu bolu is a trusted personal career-operations assistant for job seekers. It turns ordinary language into organized, reviewable actions: recording applications, scheduling interviews, and creating follow-up tasks. The product should reduce administrative work around a job search without taking control away from the user.
+dolu bolu is a trusted personal career-operations assistant for job seekers. Its core entity is a **Job Drive**: one user's hiring process for a specific company and role. It turns ordinary-language progress updates into reviewable changes across `planned → applied → assessment → interview → offer → accepted`, with rejection or withdrawal possible from any active stage.
 
 The long-term product may grow into a broader professional-life assistant. A hiring-manager assistant is a possible future direction, but it is not part of the current product. Build dolu bolu well before creating a second side of the platform.
 
@@ -27,7 +27,7 @@ V1 is a job-seeker command center with:
 - Google sign-in through Supabase Auth.
 - A conversational inbox as the primary input.
 - Structured forms as a reliable manual alternative.
-- Application, interview, and task records.
+- Job Drive records with optional application target/deadline, one assessment detail record, and a consolidated interview phase.
 - AI-generated, editable action proposals.
 - Explicit confirmation before any proposal becomes a stored record.
 - Clear activity history and failure recovery.
@@ -36,27 +36,29 @@ The first end-to-end milestone is:
 
 1. A user signs in.
 2. They enter a message such as "I applied to Acme for frontend engineer yesterday."
-3. dolu bolu proposes a typed application action.
+3. dolu bolu proposes a typed `record_job_drive_progress` action.
 4. The user reviews or edits it.
-5. Only an explicit confirmation creates the record.
-6. The new record remains visible after reload.
+5. Only an explicit confirmation creates or updates the drive and its detail records.
+6. The drive and immutable activity event remain visible after reload.
 
 ## Current implementation state
 
-The application-capture milestone is implemented in code as of September 2026:
+The Job Drive foundation is implemented in code as of September 2026:
 
 - `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes.
-- `/app` loads pending application proposals and records through owner-scoped repositories.
-- `/app/applications` is a functional, reload-safe application list.
-- Applications can also be created through a deterministic no-AI form. A client-generated record UUID makes retries idempotent, while lifecycle edits use `updatedAt` as an optimistic concurrency token so stale tabs cannot overwrite newer changes.
+- `/app` loads pending drive proposals and records through owner-scoped repositories. `/app/drives` is the list; `/app/drives/[driveId]` is the detail/timeline view; `/app/applications` redirects for old bookmarks.
+- Drives can also be created and edited through deterministic forms. A client-generated UUID makes create retries idempotent, while lifecycle edits use `updatedAt` for optimistic concurrency.
+- The interactive stage bar supports click/keyboard use and opens only contextual OA/interview fields. Application and event dates remain optional.
 - The deterministic demo provider remains the default. A server-only Gemini adapter implements the same boundary with JSON-schema output, explicit timeout/error mapping, and no silent fallback. Providers propose content, while trusted code assigns database identifiers and versions.
-- `evals/application-capture.json` and `npm run eval:ai` provide a sanitized shared behavior check before a hosted model is enabled.
-- Proposal persistence is request-idempotent. Confirmation and rejection use narrow `security definer` Postgres functions; confirmation locks rows and atomically creates the application, updates execution state, and appends an activity event.
+- `evals/job-drive-progress.json` and `npm run eval:ai` provide a sanitized behavior check covering applications, OA, interviews, offers, rejection, clarification, and unsafe autonomy.
+- Proposal persistence is request-idempotent. Manual saves plus AI confirmation/rejection use narrow `security definer` Postgres functions; each confirmed mutation atomically changes the drive/details and appends immutable field-level activity.
+- Forward and skipped-stage progress is accepted. Earlier information never causes AI regression; manual backward moves and reopening terminal drives require an explicit audited correction.
+- Likely duplicates are warnings based on source URL or company/role/location; users may open an existing drive or deliberately create a separate process.
 - The browser can edit a proposal but cannot directly mutate proposal execution state or author activity history.
-- Unfinished Interviews, Tasks, Search, and Calendar controls are hidden rather than presented as working features.
+- Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 - With no Supabase environment, `/` offers an explicitly temporary local preview. With Supabase configured, `/` redirects to `/app`.
 
-Before calling the hosted slice operational, apply both migrations in `supabase/migrations`, enable the Google provider, configure the Google callback URL, add the local/deployed `/auth/callback` URLs to Supabase's redirect allow list, and run the AI evaluation with the selected Gemini model.
+Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order—including `20260916000000_job_drive_foundation.sql`—configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
 ## Explicit non-goals for V1
 
@@ -116,11 +118,7 @@ Browser components must not import server modules, provider SDKs, database crede
 
 `ActionProposalProvider` is the stable application-facing boundary. Provider-specific SDK types stay inside adapters. The default development adapter is deterministic and requires no key; Gemini is the intended first hosted adapter, with Groq or OpenAI added behind the same contract only when justified by evaluations.
 
-Supported V1 proposal kinds are intentionally narrow:
-
-- `create_application`
-- `create_interview`
-- `create_task`
+The only supported proposal kind in the current product is `record_job_drive_progress`. It can match or create a drive, advance its stage, attach OA details, or update the consolidated interview phase in one reviewed transaction. Multiple unrelated actions per message remain unsupported.
 
 Provider output is untrusted even when a vendor offers structured output. Validate it centrally with Zod, then run semantic checks in application code. Each proposal includes source evidence and visible assumptions; do not display invented confidence percentages.
 
@@ -128,9 +126,9 @@ If an action lacks information required for safe execution, return a clarificati
 
 ## Data model direction
 
-Core owner-scoped tables are `profiles`, `applications`, `interviews`, `tasks`, `proposal_batches`, `action_proposals`, and `activity_events`.
+Core owner-scoped tables are `profiles`, `job_drives`, `job_drive_assessments`, `interviews`, `proposal_batches`, `action_proposals`, and `activity_events`. The legacy `tasks` table remains in the migration history but task workflows are deferred.
 
-Store timestamps as `timestamptz`. Store the user's IANA timezone separately. An interview may exist without an application so conversational capture does not require a fragile cross-proposal dependency. Future Calendar integration stores the external event ID and sync status on the interview; it must use separate OAuth consent from sign-in.
+Store timestamps as `timestamptz`; unknown dates stay null. Assessments and interviews belong to a drive and use composite owner FKs. The interview table remains capable of multiple rounds, while v1 reads/edits the latest row as one consolidated phase. Future Calendar integration must use separate OAuth consent from sign-in and per-event approval.
 
 ## UX principles
 
@@ -163,6 +161,7 @@ npm run dev
 npm run lint
 npm run typecheck
 npm test
+npm run eval:ai
 npm run build
 ```
 

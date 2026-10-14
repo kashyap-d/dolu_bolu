@@ -4,7 +4,12 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { validateProposalEvidence } from "@/features/assistant/validate-proposal";
+import { validateProposalEvidence } from "@/features/assistant/validate-job-drive-proposal";
+import {
+  AiProviderError,
+  type ActionProposalInput,
+  type ActionProposalProvider,
+} from "@/server/ai/action-proposal-provider";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
 
 const processWithEnvLoader = process as NodeJS.Process & {
@@ -25,6 +30,19 @@ const fixtureSchema = z.array(
     .object({
       id: z.string().min(1),
       message: z.string().min(1).max(2_000),
+      context: z
+        .array(
+          z.object({
+            ref: z.string(),
+            companyName: z.string(),
+            roleTitle: z.string(),
+            stage: z.string(),
+            location: z.string().nullable(),
+            sourceUrl: z.string().nullable(),
+            updatedAt: z.string(),
+          }).strict(),
+        )
+        .optional(),
       expected: z
         .object({
           decisionKind: z.enum([
@@ -34,7 +52,12 @@ const fixtureSchema = z.array(
           ]),
           companyName: z.string().optional(),
           roleTitle: z.string().optional(),
-          status: z.enum(["saved", "applied"]).optional(),
+          stage: z.enum(["planned", "applied", "assessment", "interview", "offer", "accepted", "rejected", "withdrawn"]).optional(),
+          jobDriveRef: z.string().optional(),
+          isCorrection: z.boolean().optional(),
+          appliedAtMustBeNull: z.boolean().optional(),
+          hasAssessment: z.boolean().optional(),
+          hasInterview: z.boolean().optional(),
         })
         .strict(),
     })
@@ -43,22 +66,27 @@ const fixtureSchema = z.array(
 
 async function main() {
   const fixtureUrl = new URL(
-    "../evals/application-capture.json",
+    "../evals/job-drive-progress.json",
     import.meta.url,
   );
-  const fixtures = fixtureSchema.parse(
+  const allFixtures = fixtureSchema.parse(
     JSON.parse(await readFile(fixtureUrl, "utf8")),
   );
+  const selectedCase = process.argv[2];
+  const fixtures = selectedCase
+    ? allFixtures.filter((fixture) => fixture.id === selectedCase)
+    : allFixtures;
+  if (fixtures.length === 0) throw new Error(`Unknown evaluation case: ${selectedCase}`);
   const provider = getActionProposalProvider();
   let passed = 0;
 
   for (const fixture of fixtures) {
-    const result = await provider.propose({
+    const result = await proposeWithRetry(provider, {
       message: fixture.message,
       now: "2026-09-15T12:00:00.000Z",
       timeZone: "Asia/Kolkata",
       locale: "en-IN",
-      context: { applications: [] },
+      context: { jobDrives: fixture.context ?? [] },
     });
     const failures: string[] = [];
 
@@ -71,8 +99,8 @@ async function main() {
     if (result.decision.kind === "proposals") {
       const proposal = result.decision.proposals[0];
 
-      if (proposal?.kind !== "create_application") {
-        failures.push("expected one create_application proposal");
+      if (proposal?.kind !== "record_job_drive_progress") {
+        failures.push("expected one record_job_drive_progress proposal");
       } else {
         if (
           fixture.expected.companyName &&
@@ -89,11 +117,17 @@ async function main() {
         }
 
         if (
-          fixture.expected.status &&
-          proposal.payload.status !== fixture.expected.status
+          fixture.expected.stage &&
+          proposal.payload.stage !== fixture.expected.stage
         ) {
-          failures.push("status mismatch");
+          failures.push("stage mismatch");
         }
+
+        if (fixture.expected.jobDriveRef && proposal.payload.jobDriveRef !== fixture.expected.jobDriveRef) failures.push("jobDriveRef mismatch");
+        if (fixture.expected.isCorrection !== undefined && proposal.payload.isCorrection !== fixture.expected.isCorrection) failures.push("isCorrection mismatch");
+        if (fixture.expected.appliedAtMustBeNull && proposal.payload.appliedAt !== null) failures.push("appliedAt was invented");
+        if (fixture.expected.hasAssessment !== undefined && Boolean(proposal.payload.assessment) !== fixture.expected.hasAssessment) failures.push("assessment detail mismatch");
+        if (fixture.expected.hasInterview !== undefined && Boolean(proposal.payload.interview) !== fixture.expected.hasInterview) failures.push("interview detail mismatch");
 
         if (validateProposalEvidence(fixture.message, proposal).length > 0) {
           failures.push("evidence was not copied exactly from the source message");
@@ -115,6 +149,20 @@ async function main() {
 
   if (passed !== fixtures.length) {
     process.exitCode = 1;
+  }
+}
+
+async function proposeWithRetry(
+  provider: ActionProposalProvider,
+  input: ActionProposalInput,
+) {
+  try {
+    return await provider.propose(input);
+  } catch (error) {
+    if (error instanceof AiProviderError && error.retryable) {
+      return provider.propose(input);
+    }
+    throw error;
   }
 }
 

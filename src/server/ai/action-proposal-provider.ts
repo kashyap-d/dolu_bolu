@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ProviderDecision } from "@/features/assistant/contracts";
+import type { ProviderDecision } from "@/features/assistant/job-drive-contracts";
 
 export interface ActionProposalInput {
   message: string;
@@ -8,11 +8,14 @@ export interface ActionProposalInput {
   timeZone: string;
   locale: string;
   context: {
-    applications: ReadonlyArray<{
+    jobDrives: ReadonlyArray<{
       ref: string;
       companyName: string;
       roleTitle: string;
-      status: string;
+      stage: string;
+      location: string | null;
+      sourceUrl: string | null;
+      updatedAt: string;
     }>;
   };
 }

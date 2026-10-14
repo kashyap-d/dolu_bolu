@@ -1,8 +1,8 @@
-# dolu bolu — Full Workflow
+# Archived v0.3 application workflow
 
-This document describes every end-to-end flow in dolu bolu. It is written against the
-current source tree, so every step names the actual file, function, schema, RPC, or
-table that performs it.
+> This file documents the pre-Job-Drive application slice for historical context. It is not the current implementation contract. See [`JOB_DRIVE_WORKFLOW.md`](JOB_DRIVE_WORKFLOW.md) for the v0.4 flow and `AGENTS.md` for canonical agent instructions.
+
+The sections below explain the older application-only design that the Job Drive migration replaces.
 
 ## 0. Mental model
 

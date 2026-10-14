@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { getRequestAuth } from "@/server/auth/session";
 import {
-  ProposalRepositoryError,
-  rejectApplicationProposal,
-} from "@/server/repositories/proposal-repository";
+  JobDriveProposalRepositoryError,
+  rejectJobDriveProposal,
+} from "@/server/repositories/job-drive-proposal-repository";
 
 const rejectionRequestSchema = z.object({
   version: z.number().int().positive(),
@@ -34,7 +34,7 @@ export async function POST(
   const { proposalId } = await context.params;
 
   try {
-    const result = await rejectApplicationProposal(auth.supabase, {
+    const result = await rejectJobDriveProposal(auth.supabase, {
       proposalId,
       version: parsed.data.version,
     });
@@ -54,7 +54,7 @@ export async function POST(
         );
     }
   } catch (error) {
-    if (error instanceof ProposalRepositoryError) {
+    if (error instanceof JobDriveProposalRepositoryError) {
       return Response.json(
         { error: "The proposal could not be discarded. Please try again." },
         { status: 503 },
