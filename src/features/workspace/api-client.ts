@@ -11,6 +11,7 @@ import {
   saveJobDriveResponseSchema,
   type JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
+import { DELETE_ACCOUNT_PHRASE, deleteAccountResponseSchema } from "@/features/account/contracts";
 
 /** A request the server refused or could not complete; the message is safe to show. */
 export class ApiError extends Error {
@@ -107,6 +108,16 @@ export const api = {
       input,
       saveJobDriveResponseSchema,
       "The Job Drive could not be saved.",
+    );
+  },
+
+  async deleteAccount() {
+    await send(
+      "/api/account/delete",
+      "POST",
+      { confirmation: DELETE_ACCOUNT_PHRASE },
+      deleteAccountResponseSchema,
+      "Your account could not be deleted.",
     );
   },
 

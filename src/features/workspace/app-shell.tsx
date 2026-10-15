@@ -1,6 +1,6 @@
 "use client";
 
-import { BriefcaseBusiness, LogOut, Sparkles, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, LogOut, Settings, Sparkles, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
@@ -13,9 +13,18 @@ export interface Viewer {
   email: string | null;
 }
 
-const navItems: Array<{ to: WorkspaceTarget; label: string; icon: LucideIcon }> = [
+interface NavItem {
+  to: WorkspaceTarget;
+  label: string;
+  icon: LucideIcon;
+  /** Only meaningful with a stored account, so hidden in the preview. */
+  persistentOnly?: boolean;
+}
+
+const allNavItems: NavItem[] = [
   { to: { view: "command" }, label: "Command center", icon: Sparkles },
   { to: { view: "drives" }, label: "Drives", icon: BriefcaseBusiness },
+  { to: { view: "settings" }, label: "Your data", icon: Settings, persistentOnly: true },
 ];
 
 function initials({ displayName, email }: Viewer) {
@@ -28,7 +37,8 @@ function initials({ displayName, email }: Viewer) {
 }
 
 function isActive(current: WorkspaceTarget, item: WorkspaceTarget) {
-  return item.view === "command" ? current.view === "command" : current.view !== "command";
+  if (item.view === "drives") return current.view === "drives" || current.view === "drive";
+  return current.view === item.view;
 }
 
 function BrandMark({ size = "md" }: { size?: "sm" | "md" }) {
@@ -57,6 +67,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { current } = useWorkspaceNavigation();
+  const navItems = allNavItems.filter((item) => mode === "persistent" || !item.persistentOnly);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">

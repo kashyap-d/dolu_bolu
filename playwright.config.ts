@@ -33,6 +33,7 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_URL: "",
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
       AI_PROVIDER: "demo",
+      NEXT_DIST_DIR: ".next-e2e",
     },
   },
 });

@@ -6,7 +6,8 @@ import { createContext, use, type ReactNode } from "react";
 export type WorkspaceTarget =
   | { view: "command" }
   | { view: "drives" }
-  | { view: "drive"; driveId: string };
+  | { view: "drive"; driveId: string }
+  | { view: "settings" };
 
 export interface WorkspaceNavigation {
   current: WorkspaceTarget;
@@ -33,6 +34,8 @@ export function routedHref(target: WorkspaceTarget) {
       return "/app/drives";
     case "drive":
       return `/app/drives/${encodeURIComponent(target.driveId)}`;
+    case "settings":
+      return "/app/settings";
   }
 }
 
@@ -40,6 +43,7 @@ export function targetFromPath(pathname: string): WorkspaceTarget {
   const drive = pathname.match(/^\/app\/drives\/([^/]+)/);
   if (drive) return { view: "drive", driveId: decodeURIComponent(drive[1]) };
   if (pathname.startsWith("/app/drives")) return { view: "drives" };
+  if (pathname.startsWith("/app/settings")) return { view: "settings" };
   return { view: "command" };
 }
 

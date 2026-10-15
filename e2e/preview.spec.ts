@@ -33,6 +33,8 @@ test("records an application, then merges an OA into the same drive", async ({ p
 
 test("asks for clarification instead of guessing", async ({ page }) => {
   await page.goto("/");
+  // Account settings only exist for a signed-in, stored workspace.
+  await expect(page.getByRole("button", { name: "Your data" })).toHaveCount(0);
   await send(page, "I reached the next round.");
   await expect(page.getByText("One detail first")).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirm update" })).toHaveCount(0);

@@ -412,6 +412,12 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_my_account: {
+        Args: {
+          p_confirmation: string | null
+        }
+        Returns: Json
+      }
       is_http_url: {
         Args: {
           p_value: string | null

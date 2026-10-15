@@ -90,6 +90,18 @@ export function authenticatedJsonRoute<TSchema extends z.ZodType, TContext = unk
   };
 }
 
+/** An authenticated route without a JSON body (for example a download). */
+export function authenticatedRoute<TContext = unknown>(
+  options: { unavailableMessage: string },
+  handler: (input: { auth: RequestAuth; request: Request }, context: TContext) => Promise<Response>,
+) {
+  return async (request: Request, context: TContext) => {
+    const auth = await getRequestAuth();
+    if (!auth) return unauthenticated();
+    return run(options, () => handler({ auth, request }, context));
+  };
+}
+
 /**
  * Like `authenticatedJsonRoute`, but when Supabase is not configured the
  * handler runs for the local preview with `auth: null`.

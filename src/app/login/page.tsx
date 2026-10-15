@@ -41,6 +41,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           )}
         </div>
 
+        {query.deleted ? (
+          <Notice className="mt-4" role="status" tone="success">
+            Your account and all of its data have been deleted.
+          </Notice>
+        ) : null}
         {query.error ? (
           <p className="mt-4 text-sm text-danger-ink" role="alert">
             Sign-in was not completed. Please try again.

@@ -16,7 +16,7 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0010](0010-target-user-and-naming.md) | Early-career job seekers in India; keep "Job Drive" | Accepted |
 | [0011](0011-ui-tokens-and-primitives.md) | Tailwind with enforced tokens and a few primitives | Implemented |
 | [0012](0012-testing-ci-hosting.md) | Test layers, GitHub Actions CI, Vercel hosting | Implemented except hosting |
-| [0013](0013-data-export-and-deletion.md) | Data export and account deletion ship in V1 | Planned |
+| [0013](0013-data-export-and-deletion.md) | Data export and account deletion ship in V1 | Implemented |
 | [0014](0014-legacy-application-slice-removed.md) | Remove the pre-Job-Drive application slice | Implemented |
 | [0015](0015-workspace-gateway.md) | Views depend on a gateway and navigation abstraction; the server re-render is the source of truth | Implemented |
 | [0016](0016-database-tests-on-plain-postgres.md) | Database tests and type generation on plain Postgres with a Supabase shim | Implemented |
