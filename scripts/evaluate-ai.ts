@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { z } from "zod";
 
 import { MAX_MESSAGE_LENGTH } from "@/features/assistant/contracts";
-import { validateProposalEvidence } from "@/features/assistant/validate-proposal";
+import { validateProposalEvidence, validateProposalForConfirmation } from "@/features/assistant/validate-proposal";
 import {
   AiProviderError,
   type ActionProposalInput,
@@ -103,13 +103,23 @@ async function main() {
     });
     const failures: string[] = [];
 
-    if (result.decision.kind !== fixture.expected.decisionKind) {
+    // What the user sees: the service turns a proposal that is missing required
+    // identity into a clarification question before anything is shown.
+    const caughtByApp =
+      result.decision.kind === "proposal" &&
+      validateProposalForConfirmation(result.decision.proposal).length > 0;
+    const effectiveKind = caughtByApp ? "needs_clarification" : result.decision.kind;
+
+    if (effectiveKind !== fixture.expected.decisionKind) {
       failures.push(
         `expected ${fixture.expected.decisionKind}, received ${result.decision.kind}`,
       );
     }
+    if (caughtByApp && fixture.expected.decisionKind === "needs_clarification") {
+      process.stdout.write(`  note: ${fixture.id} returned an incomplete proposal; app validation asked instead\n`);
+    }
 
-    if (result.decision.kind === "proposal") {
+    if (result.decision.kind === "proposal" && !caughtByApp) {
       const proposal = result.decision.proposal;
 
       if (proposal?.kind !== "record_job_drive_progress") {

@@ -27,7 +27,7 @@ V1 is a job-seeker command center with:
 - Google sign-in through Supabase Auth.
 - A conversational inbox as the primary input.
 - Structured forms as a reliable manual alternative.
-- Job Drive records with optional application target/deadline, one assessment detail record, and a consolidated interview phase.
+- Job Drive records with optional application date and apply-by date, one assessment detail record, and a list of interview rounds.
 - AI-generated, editable action proposals.
 - Explicit confirmation before any proposal becomes a stored record.
 - Clear activity history and failure recovery.
@@ -43,7 +43,7 @@ The first end-to-end milestone is:
 
 ## Current implementation state
 
-As of October 2026 (Phases 0–2 of the plan in `README.md` are complete):
+As of October 2026 (Phases 0–3 of the plan in `README.md` are complete):
 
 - `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes. `/app/applications` redirects to `/app/drives` via `next.config.ts`.
 - `src/app/app/layout.tsx` authenticates once and renders the shared app shell. `/app` (command center), `/app/drives` (list) and `/app/drives/[driveId]` (detail and activity) each load only the data they render; `error.tsx` and `loading.tsx` cover failures and slow loads.
@@ -57,9 +57,13 @@ As of October 2026 (Phases 0–2 of the plan in `README.md` are complete):
 - `appliedAt` and `applyBy` are calendar dates (`YYYY-MM-DD`); other event fields are timestamps with offsets. Render dates with `LocalDate` and timestamps with `LocalDateTime`.
 - Company and role matching uses `src/features/job-drives/normalize.ts`, which must stay identical to the SQL `normalize_*` functions (a database test checks parity). The model sees only `selectModelContext` output.
 - Value rules live in table `CHECK` constraints; SQL functions check JSON structure, lock, write, and append activity. The Supabase client is typed from `src/server/supabase/database.types.ts`. Regenerate it with `npm run db:types` after every migration.
+- Interview rounds are a list per drive (max 10). Payloads carry the complete list; the AI proposes one `interviewRound` that `mergeProposedRound` folds into the existing ones.
+- The command center shows an agenda (`buildAgenda`): loose ends, the next 14 days by day, and drives quiet for 21+ days. It renders in the browser only because it depends on the viewer's clock and zone.
+- Messages may be pasted emails or invites up to 8,000 characters. `redactContactDetails` removes email addresses and phone numbers on the server before the provider, evidence checks, or storage see the text.
+- `/app/settings` ("Your data") exports all of a user's rows as JSON and deletes the account through `delete_my_account`, which cascades through every user-owned table.
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 
-Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261015000000_job_drive_correctness.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
+Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261016020000_longer_source_messages.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
 ## Explicit non-goals for V1
 
@@ -82,7 +86,7 @@ Before calling the hosted slice operational, apply every migration in `supabase/
 - Send only bounded, relevant context to a model. Never send an entire job-search history when a small matching subset is sufficient.
 - Unknown information stays unknown. Ask for clarification instead of inventing companies, roles, dates, times, or entity links.
 - Store secrets only in server environment variables. Mark secret-bearing and data-access modules with `import "server-only"`.
-- Do not log raw resumes, full user messages, provider keys, auth tokens, or unnecessary personally identifiable information.
+- Do not log raw resumes, full user messages, provider keys, auth tokens, or unnecessary personally identifiable information. Contact details in pasted text are removed before they reach a model or the database.
 - All user-owned database tables require Row Level Security policies and ownership checks.
 
 ## Architecture boundaries
@@ -123,7 +127,7 @@ Browser components must not import server modules, provider SDKs, database crede
 
 `ActionProposalProvider` is the stable application-facing boundary. Provider-specific SDK types stay inside adapters. The deterministic adapter requires no key and backs tests, evals, and the preview; Gemini is the hosted adapter, with Groq or OpenAI added behind the same contract only when justified by evaluations.
 
-The only supported proposal kind in the current product is `record_job_drive_progress`. It can match or create a drive, advance its stage, attach OA details, or update the consolidated interview phase in one reviewed transaction. Exactly one proposal per message (docs/decisions/0008).
+The only supported proposal kind in the current product is `record_job_drive_progress`. It can match or create a drive, advance its stage, attach OA details, or add or update one interview round in one reviewed transaction. Exactly one proposal per message (docs/decisions/0008).
 
 Provider output is untrusted even when a vendor offers structured output. Validate it centrally with Zod, then run semantic checks in application code. Each proposal includes source evidence and visible assumptions; do not display invented confidence percentages.
 
@@ -133,7 +137,7 @@ If an action lacks information required for safe execution, return a clarificati
 
 Core owner-scoped tables are `profiles`, `job_drives`, `job_drive_assessments`, `interviews`, `proposal_batches`, `action_proposals`, `activity_events`, and `ai_usage_daily` (per-user daily hosted-AI allowance). The legacy `tasks` table remains in the migration history but task workflows are deferred.
 
-Store timestamps as `timestamptz`; unknown dates stay null. Assessments and interviews belong to a drive and use composite owner FKs. The interview table remains capable of multiple rounds, while v1 reads/edits the latest row as one consolidated phase. Future Calendar integration must use separate OAuth consent from sign-in and per-event approval.
+Store timestamps as `timestamptz`; unknown dates stay null. Assessments and interviews belong to a drive and use composite owner FKs. Each `interviews` row is one round with a title, kind, and status. Future Calendar integration must use separate OAuth consent from sign-in and per-event approval.
 
 ## UX principles
 

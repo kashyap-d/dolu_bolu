@@ -23,3 +23,4 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0017](0017-matching-and-model-context.md) | Normalised name matching, no fuzzy merging, relevance-based model context | Implemented |
 | [0018](0018-interview-rounds.md) | Interview rounds as a list; the AI proposes one round, merged deterministically | Implemented |
 | [0019](0019-agenda-home.md) | An agenda home: loose ends, next two weeks by day, drives gone quiet | Implemented |
+| [0020](0020-paste-anything.md) | Paste emails and invites; contact details are removed before the model or database sees them | Implemented |

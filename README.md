@@ -24,8 +24,10 @@ Manual edits take the same final step. Every architectural choice and its trade-
 ## What works today
 
 - Google sign-in (Supabase, cookie-bound PKCE) and a protected workspace at `/app`.
-- A command center: natural-language updates, review/confirm/discard, manual entry, and an upcoming-dates panel.
-- A drive list and a drive page with an interactive stage bar, OA and interview details, and an activity history.
+- A command center whose main input accepts your own words or a pasted OA invite, recruiter email, or interview invitation. Email addresses and phone numbers are removed before anything is sent or saved.
+- An agenda of what needs you next: loose ends (a round that has passed but is still marked scheduled, missed OA or apply-by dates), the next two weeks by day, and drives that have gone quiet.
+- A drive list and a drive page with an interactive stage bar, OA details, interview rounds as a list, and an activity history.
+- "Your data": export everything as JSON, or permanently delete your account.
 - Retry-safe creates, optimistic concurrency on edits, duplicate warnings that recognise "Globex Pvt. Ltd." and "globex" as the same company, and explicitly audited corrections for backward moves.
 - Day-precision facts (applied on, apply by) stored as calendar dates in your own time zone.
 - Row Level Security on every user table; the browser cannot write tables directly.
@@ -77,7 +79,7 @@ With the template values, [http://localhost:3000](http://localhost:3000) opens t
 2. Run `npm run eval:ai` before using real messages.
 3. Optionally tune `AI_MODEL`, `AI_TIMEOUT_MS`, `AI_MAX_OUTPUT_TOKENS`, and `AI_DAILY_REQUEST_LIMIT`.
 
-The provider receives only the message, the current time/time zone/locale, and a few summaries of your own drives: those at companies the message names, or up to 10 recent active ones if it names none. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
+The provider receives only the message (with email addresses and phone numbers removed), the current time/time zone/locale, and a few summaries of your own drives: those at companies the message names, or up to 10 recent active ones if it names none. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
 
 ## Quality gates
 
@@ -100,7 +102,8 @@ After changing a migration, run `npm run db:types` to regenerate `src/server/sup
 | 0. Cleanup — done | Legacy application slice removed, AI quota, CI, decision records. |
 | 1. Structure — done | App shell layout, gateway/navigation abstractions, typed API client, shared route helper, design tokens and primitives, single-proposal contract, tested proposal resolution. |
 | 2. Correctness — done | Date-only fields, normalised drive matching, relevance-based model context, value rules as table constraints, generated database types, Gemini schema derived from Zod, database and end-to-end tests in CI. |
-| 3. Product | Agenda home screen with stale-drive detection, paste-anything extraction (OA invites, recruiter emails), interview rounds as a list, data export and account deletion. |
+| 3. Product — done | Agenda home screen with loose ends and quiet drives, paste-anything extraction with contact-detail redaction, interview rounds as a list, data export and account deletion. |
+| Next | Deploy to Vercel with a seeded demo account; signed-in end-to-end tests; reminders for loose ends (with explicit consent). |
 | Later | Separately authorized Calendar sync, an evidence-grounded application brief. |
 
 A marketplace, autonomous applications, inbox-wide email access, and a recruiter-facing product are out of scope.

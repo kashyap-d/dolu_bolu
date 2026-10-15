@@ -41,7 +41,7 @@ If Supabase is not configured, `/` renders the same workflow as an explicitly in
 - stages: `planned`, `applied`, `assessment`, `interview`, `offer`, `accepted`, `rejected`, `withdrawn`;
 - the drive core: company, role, optional stage occurrence, application date, apply-by date, location, source URL, and notes;
 - one assessment record: availability, deadline, duration, URL, status, and notes;
-- a consolidated interview summary: next schedule/timezone, mode, location, meeting URL, round summary, and notes;
+- interview rounds (up to 10): title, kind, status, time and time zone, mode, location, meeting URL, and notes;
 - manual create/update requests, duplicate candidates, confirmation outcomes, and activity events.
 
 The OA schema rejects a deadline before availability. The interview schema requires an IANA timezone value whenever a schedule is present. HTTP boundaries reject unknown keys, malformed timestamps, and non-HTTP(S) URLs.
@@ -60,7 +60,8 @@ If an exact source URL or a similar active company/role/location exists, creatio
 
 ## Assistant workflow
 
-1. The composer posts `{message, timeZone, locale, clientRequestId}` to `/api/assistant/proposals`.
+1. The composer posts `{message, timeZone, locale, clientRequestId}` to `/api/assistant/proposals`. The message may be up to 8,000 characters, including a pasted email or invite.
+1. The service replaces email addresses and phone numbers with placeholders (`redactContactDetails`). Every later step sees only the redacted text.
 2. `prepareProposal` first checks `(user_id, client_request_id)` for an idempotent replay.
 3. Before calling a hosted model it reserves one unit of the user's daily allowance (`consume_ai_request`). The unauthenticated preview never reaches a hosted model.
 4. It sends the message, time context, and the drive summaries chosen by `selectModelContext`: drives at companies the message names, or up to 10 recent active drives if it names none.
@@ -124,9 +125,11 @@ Migration `20261015000000_job_drive_correctness.sql` then:
 
 - `src/app/app/layout.tsx` authenticates once and renders `PersistentWorkspace`: the app shell, routed navigation, and the HTTP gateway. After a successful write the gateway calls `router.refresh()`, so the screen re-renders from the database rather than from optimistic client state.
 - `PreviewWorkspace` (at `/` without Supabase) renders the same views with an in-memory gateway and state-based navigation.
-- `CommandCenterView`: composer, review queue, manual entry, upcoming dates.
+- `CommandCenterView`: composer, review queue, manual entry, and the agenda.
 - `DrivesView` / `JobDriveList`: company, role, stage, nearest important date.
-- `DriveDetailView` / `JobDriveDetail`: stage bar, OA/interview summaries, notes, activity.
+- `DriveDetailView` / `JobDriveDetail`: stage bar, OA summary, interview rounds, notes, activity.
+- `AgendaPanel`: loose ends, the next two weeks, and quiet drives, computed by `buildAgenda`.
+- `AccountSettings` (`/app/settings`): JSON export and account deletion.
 - `JobDriveEditor`: the shared create/edit/review form, expanding only stage-relevant sections.
 - `src/app/app/error.tsx` and `loading.tsx` handle failed and slow loads for every workspace route.
 
