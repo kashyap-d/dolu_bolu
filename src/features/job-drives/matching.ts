@@ -1,8 +1,9 @@
 import type { JobDrive, JobDriveStage } from "./contracts";
+import { normalizeCompanyName, normalizeRoleTitle } from "./normalize";
 import { isTerminalStage } from "./stage-rules";
 
 function normalized(value: string | null | undefined) {
-  return value?.trim().toLocaleLowerCase() ?? null;
+  return value?.trim().toLocaleLowerCase() || null;
 }
 
 export function matchingJobDrives(
@@ -23,14 +24,14 @@ export function matchingJobDrives(
     if (exactSource.length) return exactSource;
   }
 
-  const company = normalized(candidate.companyName);
-  const role = normalized(candidate.roleTitle);
-  if (!company || !role) return [];
+  if (!candidate.companyName?.trim() || !candidate.roleTitle?.trim()) return [];
+  const company = normalizeCompanyName(candidate.companyName);
+  const role = normalizeRoleTitle(candidate.roleTitle);
 
   let matches = drives.filter(
     (drive) =>
-      normalized(drive.companyName) === company &&
-      normalized(drive.roleTitle) === role,
+      normalizeCompanyName(drive.companyName) === company &&
+      normalizeRoleTitle(drive.roleTitle) === role,
   );
   const location = normalized(candidate.location);
   if (location) {

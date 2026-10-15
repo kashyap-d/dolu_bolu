@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, Eyebrow } from "@/components/ui/card";
-import { LocalDateTime } from "@/components/ui/local-date-time";
+import { LocalDate, LocalDateTime } from "@/components/ui/local-date-time";
 
 import type { ActivityEvent, JobDrive, JobDriveStage } from "../contracts";
 import { stageLabel } from "../stage-rules";
@@ -84,8 +84,8 @@ export function JobDriveDetail({
       <div className="grid gap-4 lg:grid-cols-3">
         <SummaryCard title="Drive details">
           <Row label="Stage reached"><LocalDateTime value={drive.stageOccurredAt} /></Row>
-          <Row label="Applied"><LocalDateTime value={drive.appliedAt} /></Row>
-          <Row label="Apply by"><LocalDateTime value={drive.applyBy} /></Row>
+          <Row label="Applied"><LocalDate value={drive.appliedAt} /></Row>
+          <Row label="Apply by"><LocalDate value={drive.applyBy} /></Row>
           {drive.location ? (
             <p className="flex gap-1.5"><MapPin aria-hidden="true" size={14} /> {drive.location}</p>
           ) : null}

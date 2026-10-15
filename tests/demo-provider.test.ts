@@ -27,3 +27,17 @@ describe("Job Drive demo provider", () => {
     assert.equal(result.decision.kind, "needs_clarification");
   });
 });
+
+describe("demo provider dates", () => {
+  it("resolves 'yesterday' to the user's calendar date, not the UTC date", async () => {
+    // 20:00 UTC on the 14th is already the 15th in India, so yesterday is the 14th.
+    const result = await new JobDriveDemoProvider().propose({
+      ...base,
+      now: "2026-10-14T20:00:00.000Z",
+      message: "I applied to Acme for Backend Engineer yesterday.",
+    });
+    assert.equal(result.decision.kind, "proposal");
+    if (result.decision.kind !== "proposal") return;
+    assert.equal(result.decision.proposal.payload.appliedAt, "2026-10-14");
+  });
+});

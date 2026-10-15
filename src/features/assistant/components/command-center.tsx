@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, Eyebrow, PageHeader } from "@/components/ui/card";
-import { LocalDateTime } from "@/components/ui/local-date-time";
+import { LocalWhen } from "@/components/ui/local-date-time";
 import { Notice } from "@/components/ui/notice";
 import type { ActionProposal, AssistantResponse } from "@/features/assistant/contracts";
 import { JobDriveEditor } from "@/features/job-drives/components/job-drive-editor";
@@ -25,14 +25,11 @@ const suggestions = [
 
 function upcomingDates(drives: JobDrive[], now: number, limit = 4) {
   return drives
-    .map((drive) => ({ drive, important: importantDateForDrive(drive) }))
-    .filter(
-      (item): item is { drive: JobDrive; important: { label: string; value: string } } =>
-        item.important !== undefined &&
-        item.important !== null &&
-        new Date(item.important.value).getTime() >= now,
-    )
-    .sort((left, right) => left.important.value.localeCompare(right.important.value))
+    .flatMap((drive) => {
+      const important = importantDateForDrive(drive, now);
+      return important && important.at >= now ? [{ drive, important }] : [];
+    })
+    .sort((left, right) => left.important.at - right.important.at)
     .slice(0, limit);
 }
 
@@ -275,7 +272,7 @@ export function CommandCenterView({
                           {important.label} · {drive.companyName}
                         </span>
                         <span className="text-muted">
-                          <LocalDateTime value={important.value} />
+                          <LocalWhen allDay={important.allDay} value={important.value} />
                         </span>
                       </span>
                     </WorkspaceLink>

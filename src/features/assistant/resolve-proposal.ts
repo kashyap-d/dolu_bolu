@@ -10,6 +10,7 @@ import {
 } from "@/features/assistant/validate-proposal";
 import type { JobDrive } from "@/features/job-drives/contracts";
 import { matchingJobDrives } from "@/features/job-drives/matching";
+import { normalizeCompanyName, normalizeRoleTitle } from "@/features/job-drives/normalize";
 import {
   mergeAssessmentDetails,
   mergeInterviewSummary,
@@ -22,9 +23,6 @@ export type ResolvedProposal =
 
 const explicitCorrection = /\b(?:correction|correct|mistake|wrong|reopen)\b/i;
 
-function sameText(left: string, right: string) {
-  return left.toLocaleLowerCase() === right.toLocaleLowerCase();
-}
 
 function issue(fieldPath: string, message: string): ResolvedProposal {
   return { ok: false, issues: [{ fieldPath, message }] };
@@ -77,8 +75,10 @@ export function resolveProposal(
 
   if (
     existing &&
-    ((payload.companyName && !sameText(payload.companyName, existing.companyName)) ||
-      (payload.roleTitle && !sameText(payload.roleTitle, existing.roleTitle)))
+    ((payload.companyName &&
+      normalizeCompanyName(payload.companyName) !== normalizeCompanyName(existing.companyName)) ||
+      (payload.roleTitle &&
+        normalizeRoleTitle(payload.roleTitle) !== normalizeRoleTitle(existing.roleTitle)))
   ) {
     return issue(
       "jobDriveRef",

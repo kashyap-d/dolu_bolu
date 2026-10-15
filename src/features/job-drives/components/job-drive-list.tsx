@@ -3,7 +3,7 @@
 import { ArrowRight, BriefcaseBusiness, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { LocalDateTime } from "@/components/ui/local-date-time";
+import { LocalWhen } from "@/components/ui/local-date-time";
 import { WorkspaceLink } from "@/features/workspace/navigation";
 
 import type { JobDrive } from "../contracts";
@@ -66,7 +66,7 @@ export function JobDriveList({ drives, onCreate }: { drives: JobDrive[]; onCreat
                     <>
                       <span className="font-semibold text-ink-soft">{important.label}</span>
                       <br />
-                      <LocalDateTime value={important.value} />
+                      <LocalWhen allDay={important.allDay} value={important.value} />
                     </>
                   ) : (
                     "No dated event"

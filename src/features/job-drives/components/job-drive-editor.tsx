@@ -114,8 +114,8 @@ export function JobDriveEditor({
   const [roleTitle, setRoleTitle] = useState(initial.roleTitle);
   const [stage, setStage] = useState(initial.stage);
   const [stageOccurredAt, setStageOccurredAt] = useState(toLocalDateTime(initial.stageOccurredAt));
-  const [appliedAt, setAppliedAt] = useState(toLocalDateTime(initial.appliedAt));
-  const [applyBy, setApplyBy] = useState(toLocalDateTime(initial.applyBy));
+  const [appliedAt, setAppliedAt] = useState(initial.appliedAt ?? "");
+  const [applyBy, setApplyBy] = useState(initial.applyBy ?? "");
   const [location, setLocation] = useState(initial.location ?? "");
   const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl ?? "");
   const [notes, setNotes] = useState(initial.notes ?? "");
@@ -150,8 +150,9 @@ export function JobDriveEditor({
       roleTitle,
       stage,
       stageOccurredAt: toIsoOrNull(stageOccurredAt),
-      appliedAt: toIsoOrNull(appliedAt),
-      applyBy: toIsoOrNull(applyBy),
+      // <input type="date"> already yields YYYY-MM-DD.
+      appliedAt: appliedAt || null,
+      applyBy: applyBy || null,
       location: trimmedOrNull(location),
       sourceUrl: trimmedOrNull(sourceUrl),
       notes: trimmedOrNull(notes),
@@ -279,7 +280,7 @@ export function JobDriveEditor({
             <TextInput
               invalid={Boolean(fieldErrors.appliedAt)}
               onChange={(event) => setAppliedAt(event.target.value)}
-              type="datetime-local"
+              type="date"
               value={appliedAt}
             />
           </Field>
@@ -287,7 +288,7 @@ export function JobDriveEditor({
             <TextInput
               invalid={Boolean(fieldErrors.applyBy)}
               onChange={(event) => setApplyBy(event.target.value)}
-              type="datetime-local"
+              type="date"
               value={applyBy}
             />
           </Field>

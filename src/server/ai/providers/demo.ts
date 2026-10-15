@@ -2,6 +2,7 @@ import "server-only";
 
 import type { JobDriveStage } from "@/features/job-drives/contracts";
 import { stageLabel } from "@/features/job-drives/stage-rules";
+import { addDays, calendarDate } from "@/lib/dates";
 
 import type {
   ActionProposalInput,
@@ -29,12 +30,14 @@ function clean(value: string) {
   return value.replace(/[.!?]+$/, "").trim();
 }
 
-function relativeDate(input: ActionProposalInput, word: string | null) {
-  if (!word) return null;
-  const date = new Date(input.now);
-  if (word.toLowerCase() === "yesterday") date.setUTCDate(date.getUTCDate() - 1);
-  if (word.toLowerCase() === "tomorrow") date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString();
+const dayOffsets: Record<string, number> = { yesterday: -1, today: 0, tomorrow: 1 };
+
+/** A relative day word as an instant (for events) and as the user's calendar date (for day-only facts). */
+function relativeDay(input: ActionProposalInput, word: string | null) {
+  if (!word) return { instant: null, date: null };
+  const offset = dayOffsets[word.toLowerCase()] ?? 0;
+  const instant = new Date(new Date(input.now).getTime() + offset * 86_400_000).toISOString();
+  return { instant, date: addDays(calendarDate(new Date(input.now), input.timeZone), offset) };
 }
 
 function matchingRef(input: ActionProposalInput, company: string, role: string) {
@@ -124,9 +127,9 @@ export class JobDriveDemoProvider implements ActionProposalProvider {
     }
 
     const dateWord = message.match(/\b(yesterday|today|tomorrow)\b/i)?.[1] ?? null;
-    const eventAt = relativeDate(input, dateWord);
+    const { instant: eventAt, date: eventDate } = relativeDay(input, dateWord);
     const dateAssumption = eventAt
-      ? [`“${dateWord}” is resolved from the supplied current time.`]
+      ? [`“${dateWord}” is resolved in your time zone (${input.timeZone}).`]
       : null;
     const body = clean(message.replace(/\s+\b(?:yesterday|today|tomorrow)\b[.!?]*$/i, ""));
 
@@ -142,7 +145,7 @@ export class JobDriveDemoProvider implements ActionProposalProvider {
         stage: "applied",
         summary: `Move ${companyName} · ${roleTitle} to Applied`,
         assumptions: dateAssumption ?? ["The application date stays unknown because none was stated."],
-        payload: { appliedAt: eventAt },
+        payload: { appliedAt: eventDate },
       });
     }
 

@@ -8,7 +8,7 @@ import type { JobDrive } from "../src/features/job-drives/contracts";
 function drive(overrides: Partial<JobDrive> = {}): JobDrive {
   return {
     id: crypto.randomUUID(), companyName: "Acme", roleTitle: "Backend Engineer", stage: "interview",
-    stageOccurredAt: null, appliedAt: "2026-09-01T09:00:00.000Z", applyBy: null, location: null,
+    stageOccurredAt: null, appliedAt: "2026-09-01", applyBy: null, location: null,
     sourceUrl: null, notes: "Referred by Priya", assessment: null, interview: null,
     createdAt: "2026-09-01T09:00:00.000Z", updatedAt: "2026-09-10T09:00:00.000Z", ...overrides,
   };

@@ -1,114 +1,59 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-
-import { RepositoryError } from "@/server/repositories/errors";
 
 import { normalizeActivityMetadata } from "@/features/job-drives/activity";
 import {
   activityEventSchema,
-  assessmentRecordSchema,
-  interviewSummaryRecordSchema,
   jobDriveSchema,
   saveJobDriveResponseSchema,
   type ActivityEvent,
   type JobDrive,
   type JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
+import { RepositoryError } from "@/server/repositories/errors";
+import type { Database } from "@/server/supabase/database.types";
+import type { AppSupabaseClient } from "@/server/supabase/server";
 
-const driveRowSchema = z.object({
-  id: z.uuid(),
-  company_name: z.string(),
-  role_title: z.string(),
-  stage: z.string(),
-  stage_occurred_at: z.string().nullable(),
-  applied_at: z.string().nullable(),
-  apply_by: z.string().nullable(),
-  location: z.string().nullable(),
-  source_url: z.string().nullable(),
-  notes: z.string().nullable(),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
+type Tables = Database["public"]["Tables"];
+type DriveRow = Pick<
+  Tables["job_drives"]["Row"],
+  | "id" | "company_name" | "role_title" | "stage" | "stage_occurred_at" | "applied_at"
+  | "apply_by" | "location" | "source_url" | "notes" | "created_at" | "updated_at"
+>;
+type AssessmentRow = Pick<
+  Tables["job_drive_assessments"]["Row"],
+  | "job_drive_id" | "status" | "available_from" | "due_at" | "duration_minutes"
+  | "assessment_url" | "notes" | "updated_at"
+>;
+type InterviewRow = Pick<
+  Tables["interviews"]["Row"],
+  | "job_drive_id" | "starts_at" | "timezone" | "mode" | "location" | "meeting_url"
+  | "round_summary" | "notes" | "updated_at"
+>;
 
-const assessmentRowSchema = z.object({
-  job_drive_id: z.uuid(),
-  status: z.string(),
-  available_from: z.string().nullable(),
-  due_at: z.string().nullable(),
-  duration_minutes: z.number().int().nullable(),
-  assessment_url: z.string().nullable(),
-  notes: z.string().nullable(),
-  updated_at: z.string(),
-});
+const driveColumns =
+  "id, company_name, role_title, stage, stage_occurred_at, applied_at, apply_by, location, source_url, notes, created_at, updated_at";
+const assessmentColumns =
+  "job_drive_id, status, available_from, due_at, duration_minutes, assessment_url, notes, updated_at";
+const interviewColumns =
+  "job_drive_id, starts_at, timezone, mode, location, meeting_url, round_summary, notes, updated_at";
 
-const interviewRowSchema = z.object({
-  job_drive_id: z.uuid(),
-  starts_at: z.string().nullable(),
-  timezone: z.string().nullable(),
-  mode: z.string(),
-  location: z.string().nullable(),
-  meeting_url: z.string().nullable(),
-  round_summary: z.string().nullable(),
-  notes: z.string().nullable(),
-  updated_at: z.string(),
-});
-
-const activityRowSchema = z.object({
-  id: z.uuid(),
-  event_type: z.string(),
-  metadata: z.unknown(),
-  created_at: z.string(),
-});
-
+/** Results of the save_job_drive RPC, which returns untyped JSON. */
 const saveJobDriveRpcSchema = z.union([
   saveJobDriveResponseSchema,
   z.object({
-    outcome: z.enum([
-      "auth_required",
-      "not_found",
-      "conflict",
-      "correction_required",
-      "invalid_payload",
-    ]),
+    outcome: z.enum(["auth_required", "not_found", "conflict", "correction_required", "invalid_payload"]),
   }),
 ]);
 
-const driveSelect =
-  "id, company_name, role_title, stage, stage_occurred_at, applied_at, apply_by, location, source_url, notes, created_at, updated_at";
-
-function toAssessment(row: z.infer<typeof assessmentRowSchema>) {
-  return assessmentRecordSchema.parse({
-    status: row.status,
-    availableFrom: row.available_from,
-    dueAt: row.due_at,
-    durationMinutes: row.duration_minutes,
-    assessmentUrl: row.assessment_url,
-    notes: row.notes,
-    updatedAt: row.updated_at,
-  });
-}
-
-function toInterview(row: z.infer<typeof interviewRowSchema>) {
-  return interviewSummaryRecordSchema.parse({
-    nextScheduledAt: row.starts_at,
-    timeZone: row.timezone,
-    mode: row.mode,
-    location: row.location,
-    meetingUrl: row.meeting_url,
-    roundSummary: row.round_summary,
-    notes: row.notes,
-    updatedAt: row.updated_at,
-  });
-}
-
-function toJobDrive(
-  row: z.infer<typeof driveRowSchema>,
-  assessment: z.infer<typeof assessmentRowSchema> | null,
-  interview: z.infer<typeof interviewRowSchema> | null,
-) {
-  return jobDriveSchema.parse({
+/**
+ * Column types come from the generated database types; values that the
+ * database stores as plain text (stages, statuses, dates) are still checked
+ * against the domain contract on the way out.
+ */
+function toJobDrive(row: DriveRow, assessment: AssessmentRow | null, interview: InterviewRow | null) {
+  const parsed = jobDriveSchema.safeParse({
     id: row.id,
     companyName: row.company_name,
     roleTitle: row.role_title,
@@ -119,119 +64,101 @@ function toJobDrive(
     location: row.location,
     sourceUrl: row.source_url,
     notes: row.notes,
-    assessment: assessment ? toAssessment(assessment) : null,
-    interview: interview ? toInterview(interview) : null,
+    assessment: assessment && {
+      status: assessment.status,
+      availableFrom: assessment.available_from,
+      dueAt: assessment.due_at,
+      durationMinutes: assessment.duration_minutes,
+      assessmentUrl: assessment.assessment_url,
+      notes: assessment.notes,
+      updatedAt: assessment.updated_at,
+    },
+    interview: interview && {
+      nextScheduledAt: interview.starts_at,
+      timeZone: interview.timezone,
+      mode: interview.mode,
+      location: interview.location,
+      meetingUrl: interview.meeting_url,
+      roundSummary: interview.round_summary,
+      notes: interview.notes,
+      updatedAt: interview.updated_at,
+    },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
+  if (!parsed.success) throw new RepositoryError("Stored Job Drive data is invalid.");
+  return parsed.data;
 }
 
-async function loadSupportingRecords(
-  supabase: SupabaseClient,
-  userId: string,
-  jobDriveIds: string[],
-) {
-  const [assessmentResult, interviewResult] = await Promise.all([
+async function loadDetails(supabase: AppSupabaseClient, userId: string, jobDriveIds: string[]) {
+  const [assessments, interviews] = await Promise.all([
     supabase
       .from("job_drive_assessments")
-      .select(
-        "job_drive_id, status, available_from, due_at, duration_minutes, assessment_url, notes, updated_at",
-      )
+      .select(assessmentColumns)
       .eq("user_id", userId)
       .in("job_drive_id", jobDriveIds),
     supabase
       .from("interviews")
-      .select(
-        "job_drive_id, starts_at, timezone, mode, location, meeting_url, round_summary, notes, updated_at",
-      )
+      .select(interviewColumns)
       .eq("user_id", userId)
       .in("job_drive_id", jobDriveIds)
       .order("updated_at", { ascending: false }),
   ]);
-
-  if (assessmentResult.error || interviewResult.error) {
+  if (assessments.error || interviews.error) {
     throw new RepositoryError("Could not load Job Drive details.");
   }
 
-  const assessments = z.array(assessmentRowSchema).safeParse(assessmentResult.data);
-  const interviews = z.array(interviewRowSchema).safeParse(interviewResult.data);
-  if (!assessments.success || !interviews.success) {
-    throw new RepositoryError("Stored Job Drive details are invalid.");
+  const assessmentByDrive = new Map(assessments.data.map((row) => [row.job_drive_id, row]));
+  // v1 shows one consolidated interview phase: the most recently updated row.
+  const interviewByDrive = new Map<string, InterviewRow>();
+  for (const row of interviews.data) {
+    if (row.job_drive_id && !interviewByDrive.has(row.job_drive_id)) {
+      interviewByDrive.set(row.job_drive_id, row);
+    }
   }
-
-  return { assessments: assessments.data, interviews: interviews.data };
+  return { assessmentByDrive, interviewByDrive };
 }
 
-export async function listJobDrives(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<JobDrive[]> {
-  const driveResult = await supabase
+export async function listJobDrives(supabase: AppSupabaseClient, userId: string): Promise<JobDrive[]> {
+  const { data, error } = await supabase
     .from("job_drives")
-    .select(driveSelect)
+    .select(driveColumns)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(100);
+  if (error) throw new RepositoryError("Could not load Job Drives.");
+  if (data.length === 0) return [];
 
-  if (driveResult.error) {
-    throw new RepositoryError("Could not load Job Drives.");
-  }
-
-  const drives = z.array(driveRowSchema).safeParse(driveResult.data);
-  if (!drives.success) {
-    throw new RepositoryError("Stored Job Drive data is invalid.");
-  }
-  if (drives.data.length === 0) return [];
-  const supporting = await loadSupportingRecords(
-    supabase,
-    userId,
-    drives.data.map((drive) => drive.id),
-  );
-
-  const assessments = new Map(
-    supporting.assessments.map((row) => [row.job_drive_id, row]),
-  );
-  const interviews = new Map<string, z.infer<typeof interviewRowSchema>>();
-  for (const row of supporting.interviews) {
-    if (!interviews.has(row.job_drive_id)) interviews.set(row.job_drive_id, row);
-  }
-
-  return drives.data.map((row) =>
-    toJobDrive(
-      row,
-      assessments.get(row.id) ?? null,
-      interviews.get(row.id) ?? null,
-    ),
+  const details = await loadDetails(supabase, userId, data.map((row) => row.id));
+  return data.map((row) =>
+    toJobDrive(row, details.assessmentByDrive.get(row.id) ?? null, details.interviewByDrive.get(row.id) ?? null),
   );
 }
 
 export async function findJobDrive(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   userId: string,
   jobDriveId: string,
 ): Promise<JobDrive | null> {
   const { data, error } = await supabase
     .from("job_drives")
-    .select(driveSelect)
+    .select(driveColumns)
     .eq("id", jobDriveId)
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw new RepositoryError("Could not load the Job Drive.");
   if (!data) return null;
-  const drive = driveRowSchema.safeParse(data);
-  if (!drive.success) {
-    throw new RepositoryError("Stored Job Drive data is invalid.");
-  }
-  const supporting = await loadSupportingRecords(supabase, userId, [jobDriveId]);
+
+  const details = await loadDetails(supabase, userId, [jobDriveId]);
   return toJobDrive(
-    drive.data,
-    supporting.assessments[0] ?? null,
-    supporting.interviews[0] ?? null,
+    data,
+    details.assessmentByDrive.get(jobDriveId) ?? null,
+    details.interviewByDrive.get(jobDriveId) ?? null,
   );
 }
 
 export async function listJobDriveActivity(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   userId: string,
   jobDriveId: string,
 ): Promise<ActivityEvent[]> {
@@ -243,16 +170,11 @@ export async function listJobDriveActivity(
     .eq("entity_id", jobDriveId)
     .order("created_at", { ascending: false })
     .limit(100);
-
   if (error) throw new RepositoryError("Could not load activity history.");
-  const rows = z.array(activityRowSchema).safeParse(data);
-  if (!rows.success) {
-    throw new RepositoryError("Stored activity history is invalid.");
-  }
 
-  return rows.data.map((row) => {
+  return data.map((row) => {
     const metadata = normalizeActivityMetadata(row.metadata);
-    return activityEventSchema.parse({
+    const parsed = activityEventSchema.safeParse({
       id: row.id,
       eventType: row.event_type,
       source: metadata.source,
@@ -262,11 +184,13 @@ export async function listJobDriveActivity(
       occurredAt: metadata.occurredAt,
       createdAt: row.created_at,
     });
+    if (!parsed.success) throw new RepositoryError("Stored activity history is invalid.");
+    return parsed.data;
   });
 }
 
 export async function saveJobDrive(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   input: {
     jobDriveId: string;
     expectedUpdatedAt: string | null;
@@ -282,7 +206,9 @@ export async function saveJobDrive(
     p_allow_possible_duplicate: input.allowPossibleDuplicate,
     p_is_correction: input.isCorrection,
   });
-
   if (error) throw new RepositoryError("Could not save the Job Drive.");
-  return saveJobDriveRpcSchema.parse(data);
+
+  const parsed = saveJobDriveRpcSchema.safeParse(data);
+  if (!parsed.success) throw new RepositoryError("Saving returned an unexpected result.");
+  return parsed.data;
 }

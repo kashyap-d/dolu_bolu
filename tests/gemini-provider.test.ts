@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { z } from "zod";
+
+import { providerDecisionSchema } from "../src/features/assistant/contracts";
 import { AiProviderError } from "../src/server/ai/action-proposal-provider";
 import {
   GeminiActionProposalProvider,
+  toGeminiSchema,
   type GeminiProviderConfig,
 } from "../src/server/ai/providers/gemini";
 
@@ -48,7 +52,7 @@ function successfulResponse() {
                         roleTitle: "Frontend Engineer",
                         stage: "applied",
                         stageOccurredAt: "2026-09-14T12:00:00.000Z",
-                        appliedAt: "2026-09-14T12:00:00.000Z",
+                        appliedAt: "2026-09-14",
                         applyBy: null,
                         location: null,
                         sourceUrl: null,
@@ -135,5 +139,19 @@ describe("Gemini action proposal provider", () => {
       assert.equal(error.code, "INVALID_OUTPUT");
       return true;
     });
+  });
+});
+
+describe("Gemini response schema", () => {
+  const schema = JSON.stringify(toGeminiSchema(z.toJSONSchema(providerDecisionSchema)));
+
+  it("is derived from the shared contract in Gemini's supported subset", () => {
+    for (const unsupported of ['"oneOf"', '"const"', '"pattern"', '"$schema"']) {
+      assert.equal(schema.includes(unsupported), false, unsupported);
+    }
+    assert.match(schema, /"enum":\["proposal"\]/);
+    assert.match(schema, /"appliedAt":\{"type":\["string","null"\],"format":"date"\}/);
+    assert.match(schema, /"assessment":\{"type":\["object","null"\]/);
+    assert.match(schema, /exact, case-sensitive substring/);
   });
 });

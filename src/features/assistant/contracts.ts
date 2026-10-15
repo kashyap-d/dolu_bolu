@@ -5,25 +5,53 @@ import { jobDriveProgressPayloadSchema } from "@/features/job-drives/contracts";
 export const evidenceSchema = z
   .object({
     fieldPath: z.string().min(1).max(80),
-    quote: z.string().min(1).max(240),
+    quote: z
+      .string()
+      .min(1)
+      .max(240)
+      .describe("An exact, case-sensitive substring copied from the source message."),
   })
   .strict();
 
 const proposalContentShape = {
   kind: z.literal("record_job_drive_progress"),
-  summary: z.string().min(1).max(180),
-  evidence: z.array(evidenceSchema).max(8),
+  summary: z.string().min(1).max(180).describe("A concise description of the change, under 180 characters."),
+  evidence: z
+    .array(evidenceSchema)
+    .max(8)
+    .describe("Quote the message for every company, role, stage, or date the proposal sets."),
   assumptions: z.array(z.string().min(1).max(180)).max(8),
 };
 
-/** What a provider may propose. It can reference a drive only by an opaque context ref. */
-export const providerJobDrivePayloadSchema = jobDriveProgressPayloadSchema
-  .omit({ companyName: true, roleTitle: true })
-  .extend({
-    jobDriveRef: z.string().regex(/^job-drive:[0-9a-f-]{36}$/).nullable(),
+/**
+ * What a provider may propose. It can reference a drive only by an opaque
+ * context ref. Identity fields come first on purpose: models with structured
+ * output fill fields in schema order, and deciding *which* drive comes before
+ * deciding what changed.
+ */
+export const providerJobDrivePayloadSchema = z
+  .object({
+    jobDriveRef: z
+      .string()
+      .regex(/^job-drive:[0-9a-f-]{36}$/)
+      .nullable()
+      .describe("The exact ref of a drive from the supplied context, or null for a new drive."),
     isCorrection: z.boolean(),
-    companyName: z.string().trim().min(1).max(120).nullable(),
-    roleTitle: z.string().trim().min(1).max(160).nullable(),
+    companyName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .nullable()
+      .describe("As written in the message. Null only when jobDriveRef is set; otherwise ask instead."),
+    roleTitle: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .nullable()
+      .describe("As written in the message. Null only when jobDriveRef is set; otherwise ask instead."),
+    ...jobDriveProgressPayloadSchema.omit({ companyName: true, roleTitle: true }).shape,
   })
   .strict();
 
@@ -56,7 +84,7 @@ export const actionProposalSchema = z
 const clarificationDecisionSchema = z
   .object({
     kind: z.literal("needs_clarification"),
-    question: z.string().min(1).max(240),
+    question: z.string().min(1).max(240).describe("One direct question, under 240 characters."),
     missingFields: z.array(z.string().min(1).max(80)).min(1).max(8),
   })
   .strict();
@@ -64,7 +92,7 @@ const clarificationDecisionSchema = z
 const unsupportedDecisionSchema = z
   .object({
     kind: z.literal("unsupported"),
-    message: z.string().min(1).max(240),
+    message: z.string().min(1).max(240).describe("A concise explanation, under 240 characters."),
   })
   .strict();
 

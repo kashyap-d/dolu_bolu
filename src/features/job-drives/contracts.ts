@@ -11,6 +11,8 @@ const httpUrl = z.url().max(2_048).refine(
 const nullableText = (max: number) =>
   z.string().trim().min(1).max(max).nullable();
 const nullableDateTime = z.iso.datetime({ offset: true }).nullable();
+/** A calendar day (YYYY-MM-DD) for facts known only to the day; see docs/decisions/0009. */
+const nullableDate = z.iso.date().nullable();
 const nullableTimeZone = nullableText(80).superRefine((value, context) => {
   if (!value) return;
   try {
@@ -98,8 +100,8 @@ export const jobDriveProgressPayloadSchema = z
     roleTitle: z.string().trim().min(1, "Role is required.").max(160),
     stage: jobDriveStageSchema,
     stageOccurredAt: nullableDateTime,
-    appliedAt: nullableDateTime,
-    applyBy: nullableDateTime,
+    appliedAt: nullableDate,
+    applyBy: nullableDate,
     location: nullableText(240),
     sourceUrl: httpUrl.nullable(),
     notes: nullableText(2_000),

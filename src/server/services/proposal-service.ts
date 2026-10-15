@@ -1,15 +1,13 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   assistantResponseSchema,
   providerResponseSchema,
   type AssistantRequest,
   type AssistantResponse,
 } from "@/features/assistant/contracts";
+import { selectModelContext } from "@/features/assistant/model-context";
 import { resolveProposal } from "@/features/assistant/resolve-proposal";
-import type { JobDrive } from "@/features/job-drives/contracts";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
 import { getAiDailyRequestLimit } from "@/server/env";
 import { consumeAiRequest } from "@/server/repositories/ai-usage-repository";
@@ -18,6 +16,7 @@ import {
   findProposalByClientRequest,
   persistProposal,
 } from "@/server/repositories/proposal-repository";
+import type { AppSupabaseClient } from "@/server/supabase/server";
 
 export class AiQuotaExceededError extends Error {
   constructor(readonly limit: number) {
@@ -34,22 +33,8 @@ export class ClientRequestConflictError extends Error {
 }
 
 interface PersistenceContext {
-  supabase: SupabaseClient;
+  supabase: AppSupabaseClient;
   userId: string;
-}
-
-const MODEL_CONTEXT_LIMIT = 20;
-
-function modelContext(drives: readonly JobDrive[]) {
-  return drives.slice(0, MODEL_CONTEXT_LIMIT).map((drive) => ({
-    ref: `job-drive:${drive.id}`,
-    companyName: drive.companyName,
-    roleTitle: drive.roleTitle,
-    stage: drive.stage,
-    location: drive.location,
-    sourceUrl: drive.sourceUrl,
-    updatedAt: drive.updatedAt,
-  }));
 }
 
 async function replayedResponse(
@@ -119,7 +104,7 @@ export async function prepareProposal(
       now: new Date().toISOString(),
       timeZone: request.timeZone,
       locale: request.locale,
-      context: { jobDrives: modelContext(drives) },
+      context: { jobDrives: selectModelContext(request.message, drives) },
     }),
   );
   if (decision.kind !== "proposal") {

@@ -1,9 +1,9 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { RepositoryError } from "@/server/repositories/errors";
+import type { AppSupabaseClient } from "@/server/supabase/server";
 
 const consumeResultSchema = z.discriminatedUnion("outcome", [
   z.object({
@@ -19,7 +19,7 @@ const consumeResultSchema = z.discriminatedUnion("outcome", [
 ]);
 
 export async function consumeAiRequest(
-  supabase: SupabaseClient,
+  supabase: AppSupabaseClient,
   dailyLimit: number,
 ) {
   const { data, error } = await supabase.rpc("consume_ai_request", {

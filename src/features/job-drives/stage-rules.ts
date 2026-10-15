@@ -1,3 +1,5 @@
+import { endOfLocalDay } from "@/lib/dates";
+
 import type { JobDriveStage } from "./contracts";
 
 export const primaryJobDriveStages: readonly JobDriveStage[] = [
@@ -61,35 +63,41 @@ export function inferredStage(
     : current;
 }
 
-export function importantDateForDrive(drive: {
-  applyBy: string | null;
-  assessment: { availableFrom: string | null; dueAt: string | null } | null;
-  interview: { nextScheduledAt: string | null } | null;
-}) {
-  const datedItems = [
-    drive.applyBy
-      ? { label: "Apply by", value: drive.applyBy }
-      : null,
-    drive.assessment?.dueAt
-      ? { label: "OA deadline", value: drive.assessment.dueAt }
-      : drive.assessment?.availableFrom
-        ? { label: "OA opens", value: drive.assessment.availableFrom }
-        : null,
-    drive.interview?.nextScheduledAt
-      ? { label: "Interview", value: drive.interview.nextScheduledAt }
-      : null,
-  ].filter((item): item is { label: string; value: string } => Boolean(item));
+export interface ImportantDate {
+  label: string;
+  value: string;
+  /** True for calendar dates (YYYY-MM-DD), false for exact timestamps. */
+  allDay: boolean;
+  /** Milliseconds for ordering; an all-day value counts until the end of its day. */
+  at: number;
+}
 
-  if (datedItems.length === 0) return null;
-  const future = datedItems
-    .filter((item) => new Date(item.value).getTime() >= Date.now())
-    .sort(
-      (left, right) =>
-        new Date(left.value).getTime() - new Date(right.value).getTime(),
-    );
+export function importantDateForDrive(
+  drive: {
+    applyBy: string | null;
+    assessment: { availableFrom: string | null; dueAt: string | null } | null;
+    interview: { nextScheduledAt: string | null } | null;
+  },
+  now = Date.now(),
+): ImportantDate | null {
+  const candidates: ImportantDate[] = [];
+  if (drive.applyBy) {
+    candidates.push({ label: "Apply by", value: drive.applyBy, allDay: true, at: endOfLocalDay(drive.applyBy) });
+  }
+  const assessmentDate = drive.assessment?.dueAt
+    ? { label: "OA deadline", value: drive.assessment.dueAt }
+    : drive.assessment?.availableFrom
+      ? { label: "OA opens", value: drive.assessment.availableFrom }
+      : null;
+  if (assessmentDate) {
+    candidates.push({ ...assessmentDate, allDay: false, at: new Date(assessmentDate.value).getTime() });
+  }
+  if (drive.interview?.nextScheduledAt) {
+    const value = drive.interview.nextScheduledAt;
+    candidates.push({ label: "Interview", value, allDay: false, at: new Date(value).getTime() });
+  }
+  if (candidates.length === 0) return null;
 
-  return future[0] ?? datedItems.sort(
-    (left, right) =>
-      new Date(right.value).getTime() - new Date(left.value).getTime(),
-  )[0];
+  const upcoming = candidates.filter((item) => item.at >= now).sort((left, right) => left.at - right.at);
+  return upcoming[0] ?? candidates.sort((left, right) => right.at - left.at)[0]!;
 }
