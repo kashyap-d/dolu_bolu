@@ -85,7 +85,7 @@ function proposal(
         sourceUrl: null,
         notes: null,
         assessment: null,
-        interview: null,
+        interviewRound: null,
         ...details.payload,
       },
     },
@@ -190,15 +190,17 @@ export class JobDriveDemoProvider implements ActionProposalProvider {
                   notes: null,
                 }
               : null,
-          interview:
+          interviewRound:
             stage === "interview"
               ? {
-                  nextScheduledAt: eventAt,
+                  title: "Interview",
+                  kind: "other",
+                  status: "scheduled",
+                  scheduledAt: eventAt,
                   timeZone: eventAt ? input.timeZone : null,
                   mode: "unknown",
                   location: null,
                   meetingUrl: null,
-                  roundSummary: null,
                   notes: null,
                 }
               : null,

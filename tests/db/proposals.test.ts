@@ -14,7 +14,7 @@ const drive = {
   sourceUrl: null,
   notes: null,
   assessment: null,
-  interview: null,
+  interviewRounds: [],
 };
 
 async function persist(tx: Tx, clientRequestId: string, message = "I applied to Acme for Backend Engineer") {

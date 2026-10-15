@@ -31,14 +31,17 @@ describe("Job Drive stage rules", () => {
 
 describe("importantDateForDrive", () => {
   const now = new Date("2026-10-15T06:00:00Z").getTime();
-  const none = { applyBy: null, assessment: null, interview: null };
+  const none = { applyBy: null, assessment: null, interviewRounds: [] };
 
   it("picks the nearest upcoming date across all-day and timed values", () => {
     const important = importantDateForDrive(
       {
         applyBy: "2026-10-20",
         assessment: { availableFrom: null, dueAt: "2026-10-17T18:30:00Z" },
-        interview: { nextScheduledAt: "2026-10-25T04:30:00Z" },
+        interviewRounds: [
+          { title: "HR", status: "scheduled", scheduledAt: "2026-10-25T04:30:00Z" },
+          { title: "Technical 1", status: "completed", scheduledAt: "2026-10-16T04:30:00Z" },
+        ],
       },
       now,
     );

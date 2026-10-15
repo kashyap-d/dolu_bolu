@@ -39,12 +39,15 @@ export function validateProposalForConfirmation(
     });
   }
 
-  if (
-    proposal.payload.interview?.nextScheduledAt &&
-    !proposal.payload.interview.timeZone
-  ) {
+  const rounds =
+    "interviewRound" in proposal.payload
+      ? proposal.payload.interviewRound
+        ? [proposal.payload.interviewRound]
+        : []
+      : proposal.payload.interviewRounds;
+  if (rounds.some((round) => round.scheduledAt && !round.timeZone)) {
     issues.push({
-      fieldPath: "interview.timeZone",
+      fieldPath: "interviewRound.timeZone",
       message: "A scheduled interview needs a timezone.",
     });
   }

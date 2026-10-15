@@ -21,3 +21,4 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0015](0015-workspace-gateway.md) | Views depend on a gateway and navigation abstraction; the server re-render is the source of truth | Implemented |
 | [0016](0016-database-tests-on-plain-postgres.md) | Database tests and type generation on plain Postgres with a Supabase shim | Implemented |
 | [0017](0017-matching-and-model-context.md) | Normalised name matching, no fuzzy merging, relevance-based model context | Implemented |
+| [0018](0018-interview-rounds.md) | Interview rounds as a list; the AI proposes one round, merged deterministically | Implemented |

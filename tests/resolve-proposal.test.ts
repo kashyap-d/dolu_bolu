@@ -9,7 +9,7 @@ function drive(overrides: Partial<JobDrive> = {}): JobDrive {
   return {
     id: crypto.randomUUID(), companyName: "Acme", roleTitle: "Backend Engineer", stage: "interview",
     stageOccurredAt: null, appliedAt: "2026-09-01", applyBy: null, location: null,
-    sourceUrl: null, notes: "Referred by Priya", assessment: null, interview: null,
+    sourceUrl: null, notes: "Referred by Priya", assessment: null, interviewRounds: [],
     createdAt: "2026-09-01T09:00:00.000Z", updatedAt: "2026-09-10T09:00:00.000Z", ...overrides,
   };
 }
@@ -23,7 +23,7 @@ function draft(payload: Partial<ActionProposalDraft["payload"]> = {}): ActionPro
     payload: {
       jobDriveRef: null, isCorrection: false, companyName: "Acme", roleTitle: "Backend Engineer",
       stage: "assessment", stageOccurredAt: null, appliedAt: null, applyBy: null, location: null,
-      sourceUrl: null, notes: null, assessment: null, interview: null, ...payload,
+      sourceUrl: null, notes: null, assessment: null, interviewRound: null, ...payload,
     },
   };
 }
@@ -112,5 +112,39 @@ describe("resolveProposal", () => {
     );
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.payload.roleTitle, "Backend Engineer");
+  });
+});
+
+describe("resolveProposal with interview rounds", () => {
+  const roundDraft = {
+    title: "HR", kind: "hr" as const, status: "scheduled" as const, scheduledAt: "2026-10-20T04:30:00Z",
+    timeZone: "Asia/Kolkata", mode: "virtual" as const, location: null, meetingUrl: null, notes: null,
+  };
+
+  it("adds the proposed round to the matched drive's existing rounds", () => {
+    const existingRound = {
+      id: crypto.randomUUID(), title: "Technical 1", kind: "technical" as const, status: "completed" as const,
+      scheduledAt: null, timeZone: null, mode: "virtual" as const, location: null, meetingUrl: null, notes: null,
+      updatedAt: "2026-10-10T00:00:00Z",
+    };
+    const existing = drive({ interviewRounds: [existingRound] });
+    const result = resolveProposal(
+      "HR round at Acme for Backend Engineer",
+      draft({ stage: "interview", interviewRound: roundDraft }),
+      [existing],
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.deepEqual(result.payload.interviewRounds.map((r) => r.title), ["Technical 1", "HR"]);
+    assert.equal(result.payload.interviewRounds[0]!.id, existingRound.id);
+  });
+
+  it("asks for a time zone when a round has a time but no zone", () => {
+    const result = resolveProposal(
+      "Interview at Acme for Backend Engineer",
+      draft({ stage: "interview", interviewRound: { ...roundDraft, timeZone: null } }),
+      [],
+    );
+    assert.equal(result.ok, false);
   });
 });

@@ -15,7 +15,15 @@ function payload(overrides: Record<string, unknown> = {}) {
     sourceUrl: null,
     notes: null,
     assessment: null,
-    interview: null,
+    interviewRounds: [],
+    ...overrides,
+  };
+}
+
+function round(overrides: Record<string, unknown> = {}) {
+  return {
+    id: crypto.randomUUID(), title: "Technical 1", kind: "technical", status: "scheduled",
+    scheduledAt: null, timeZone: null, mode: "virtual", location: null, meetingUrl: null, notes: null,
     ...overrides,
   };
 }
@@ -129,8 +137,11 @@ describe("Job Drive writes", { skip: skipWithoutDatabase }, () => {
       { sourceUrl: "javascript:alert(1)" },
       { appliedAt: "yesterday" },
       { companyName: "Umbrella", assessment: { status: "invited", availableFrom: "2026-10-20T00:00:00Z", dueAt: "2026-10-19T00:00:00Z", durationMinutes: null, assessmentUrl: null, notes: null } },
-      { companyName: "Umbrella", interview: { nextScheduledAt: "2026-10-20T10:00:00Z", timeZone: null, mode: "virtual", location: null, meetingUrl: null, roundSummary: null, notes: null } },
-      { companyName: "Umbrella", interview: { nextScheduledAt: null, timeZone: "Mars/Olympus", mode: "virtual", location: null, meetingUrl: null, roundSummary: null, notes: null } },
+      { companyName: "Umbrella", interviewRounds: [round({ scheduledAt: "2026-10-20T10:00:00Z", timeZone: null })] },
+      { companyName: "Umbrella", interviewRounds: [round({ timeZone: "Mars/Olympus" })] },
+      { companyName: "Umbrella", interviewRounds: [round({ kind: "lunch" })] },
+      { companyName: "Umbrella", interviewRounds: [round({ title: "" })] },
+      { companyName: "Umbrella", interviewRounds: Array.from({ length: 11 }, () => round()) },
       { unexpected: true },
     ];
     for (const drive of cases) {
@@ -140,6 +151,43 @@ describe("Job Drive writes", { skip: skipWithoutDatabase }, () => {
       const rows = await db.sql`select 1 from public.job_drives where id = ${id}`;
       assert.equal(rows.length, 0);
     }
+  });
+
+  it("keeps interview rounds as a list: adds, updates, and removes them in one write", async () => {
+    const id = crypto.randomUUID();
+    const first = round({ title: "Technical 1", scheduledAt: "2026-10-20T04:30:00Z", timeZone: "Asia/Kolkata" });
+    const second = round({ title: "HR", kind: "hr" });
+    const created = await db.as(asha, (tx) =>
+      save(tx, { id, drive: { companyName: "Rounds Co", stage: "interview", interviewRounds: [second, first] } }),
+    );
+    const rounds = created.jobDrive!.interviewRounds as Array<{ id: string; title: string; status: string }>;
+    assert.deepEqual(rounds.map((r) => r.title), ["Technical 1", "HR"], "scheduled rounds first, by time");
+
+    const updated = await db.as(asha, (tx) =>
+      save(tx, {
+        id,
+        expectedUpdatedAt: created.jobDrive!.updatedAt as string,
+        drive: { companyName: "Rounds Co", stage: "interview", interviewRounds: [{ ...first, status: "completed" }] },
+      }),
+    );
+    const after = updated.jobDrive!.interviewRounds as Array<{ id: string; status: string }>;
+    assert.deepEqual(after.map((r) => [r.id, r.status]), [[first.id, "completed"]]);
+
+    const [event] = await db.sql`
+      select metadata from public.activity_events where entity_id = ${id} order by created_at desc limit 1`;
+    assert.deepEqual((event!.metadata as { changedFields: string[] }).changedFields, ["interviewRounds"]);
+  });
+
+  it("refuses to take over another user's interview round by id", async () => {
+    const ashaRound = round();
+    await db.as(asha, (tx) => save(tx, { id: crypto.randomUUID(), drive: { companyName: "Theirs", interviewRounds: [ashaRound] } }));
+    const hijack = await db.as(ravi, (tx) =>
+      save(tx, { id: crypto.randomUUID(), drive: { companyName: "Mine", interviewRounds: [{ ...ashaRound, title: "Hijacked" }] } }),
+    );
+    assert.equal(hijack.outcome, "invalid_payload");
+    const [stored] = await db.sql`select title, user_id from public.interviews where id = ${ashaRound.id}`;
+    assert.equal(stored!.title, "Technical 1");
+    assert.equal(stored!.user_id, asha);
   });
 
   it("keeps each user's drives invisible and unwritable to others", async () => {

@@ -73,26 +73,54 @@ export const interviewModeSchema = z.enum([
   "unknown",
 ]);
 
-export const interviewSummarySchema = z
-  .object({
-    nextScheduledAt: nullableDateTime,
-    timeZone: nullableTimeZone,
-    mode: interviewModeSchema,
-    location: nullableText(240),
-    meetingUrl: httpUrl.nullable(),
-    roundSummary: nullableText(1_000),
-    notes: nullableText(2_000),
-  })
+export const interviewRoundKindSchema = z.enum([
+  "recruiter",
+  "technical",
+  "manager",
+  "hr",
+  "onsite",
+  "other",
+]);
+
+export const interviewRoundStatusSchema = z.enum(["scheduled", "completed", "cancelled"]);
+
+/** The fields of one interview round, without its identity (shared with the AI draft). */
+export const interviewRoundFields = {
+  title: z.string().trim().min(1, "Give the round a name.").max(120),
+  kind: interviewRoundKindSchema,
+  status: interviewRoundStatusSchema,
+  scheduledAt: nullableDateTime,
+  timeZone: nullableTimeZone,
+  mode: interviewModeSchema,
+  location: nullableText(240),
+  meetingUrl: httpUrl.nullable(),
+  notes: nullableText(2_000),
+};
+
+function requireTimeZoneWhenScheduled(
+  value: { scheduledAt: string | null; timeZone: string | null },
+  context: z.RefinementCtx,
+) {
+  if (value.scheduledAt && !value.timeZone) {
+    context.addIssue({
+      code: "custom",
+      path: ["timeZone"],
+      message: "A scheduled interview needs a timezone.",
+    });
+  }
+}
+
+export const interviewRoundSchema = z
+  .object({ id: z.uuid(), ...interviewRoundFields })
   .strict()
-  .superRefine((value, context) => {
-    if (value.nextScheduledAt && !value.timeZone) {
-      context.addIssue({
-        code: "custom",
-        path: ["timeZone"],
-        message: "A scheduled interview needs a timezone.",
-      });
-    }
-  });
+  .superRefine(requireTimeZoneWhenScheduled);
+
+export const interviewRoundRecordSchema = z
+  .object({ id: z.uuid(), ...interviewRoundFields, updatedAt: z.iso.datetime({ offset: true }) })
+  .strict()
+  .superRefine(requireTimeZoneWhenScheduled);
+
+export const MAX_INTERVIEW_ROUNDS = 10;
 
 export const jobDriveProgressPayloadSchema = z
   .object({
@@ -106,15 +134,11 @@ export const jobDriveProgressPayloadSchema = z
     sourceUrl: httpUrl.nullable(),
     notes: nullableText(2_000),
     assessment: assessmentDetailsSchema.nullable(),
-    interview: interviewSummarySchema.nullable(),
+    interviewRounds: z.array(interviewRoundSchema).max(MAX_INTERVIEW_ROUNDS),
   })
   .strict();
 
 export const assessmentRecordSchema = assessmentDetailsSchema.extend({
-  updatedAt: z.iso.datetime({ offset: true }),
-});
-
-export const interviewSummaryRecordSchema = interviewSummarySchema.extend({
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
@@ -123,7 +147,7 @@ export const jobDriveSchema = jobDriveProgressPayloadSchema.extend({
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
   assessment: assessmentRecordSchema.nullable(),
-  interview: interviewSummaryRecordSchema.nullable(),
+  interviewRounds: z.array(interviewRoundRecordSchema).max(MAX_INTERVIEW_ROUNDS),
 });
 
 export const activityEventSchema = z
@@ -200,7 +224,9 @@ export const confirmJobDriveResponseSchema = z.discriminatedUnion("outcome", [
 
 export type JobDriveStage = z.infer<typeof jobDriveStageSchema>;
 export type AssessmentDetails = z.infer<typeof assessmentDetailsSchema>;
-export type InterviewSummary = z.infer<typeof interviewSummarySchema>;
+export type InterviewRound = z.infer<typeof interviewRoundSchema>;
+export type InterviewRoundKind = z.infer<typeof interviewRoundKindSchema>;
+export type InterviewRoundStatus = z.infer<typeof interviewRoundStatusSchema>;
 export type JobDriveProgressPayload = z.infer<
   typeof jobDriveProgressPayloadSchema
 >;

@@ -12,7 +12,8 @@ import type {
   JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
 import { matchingJobDrives } from "@/features/job-drives/matching";
-import { mergeAssessmentDetails, mergeInterviewSummary } from "@/features/job-drives/merge-details";
+import { mergeAssessmentDetails } from "@/features/job-drives/merge-details";
+import { editableRounds, mergeProposedRound } from "@/features/job-drives/rounds";
 import { changedFields, payloadFromDrive } from "@/features/job-drives/payload";
 import { inferredStage } from "@/features/job-drives/stage-rules";
 
@@ -33,7 +34,7 @@ function storedDrive(id: string, payload: JobDriveProgressPayload, existing?: Jo
     id,
     ...payload,
     assessment: payload.assessment ? { ...payload.assessment, updatedAt: now } : null,
-    interview: payload.interview ? { ...payload.interview, updatedAt: now } : null,
+    interviewRounds: payload.interviewRounds.map((round) => ({ ...round, updatedAt: now })),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -110,7 +111,11 @@ export function PreviewWorkspace() {
               stage: inferredStage(target.stage, drive.stage),
               appliedAt: drive.appliedAt ?? target.appliedAt,
               assessment: mergeAssessmentDetails(drive.assessment, target.assessment),
-              interview: mergeInterviewSummary(drive.interview, target.interview),
+              // Fold each proposed round into the existing ones, as the server would.
+              interviewRounds: drive.interviewRounds.reduce(
+                (rounds, { id, ...round }) => mergeProposedRound(round, rounds),
+                editableRounds(target.interviewRounds),
+              ),
             }
           : drive;
         const write = applyWrite(latest.current, target?.id ?? crypto.randomUUID(), payload, "assistant");

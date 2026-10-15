@@ -58,7 +58,7 @@ function successfulResponse() {
                         sourceUrl: null,
                         notes: null,
                         assessment: null,
-                        interview: null,
+                        interviewRound: null,
                       },
                     },
                 }),

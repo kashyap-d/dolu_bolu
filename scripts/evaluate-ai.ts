@@ -62,6 +62,8 @@ const fixtureSchema = z.array(
           applyBy: z.iso.date().optional(),
           hasAssessment: z.boolean().optional(),
           hasInterview: z.boolean().optional(),
+          roundKind: z.string().optional(),
+          roundStatus: z.string().optional(),
         })
         .strict(),
     })
@@ -139,7 +141,9 @@ async function main() {
         if (fixture.expected.appliedAt && proposal.payload.appliedAt !== fixture.expected.appliedAt) failures.push(`appliedAt ${proposal.payload.appliedAt} ≠ ${fixture.expected.appliedAt}`);
         if (fixture.expected.applyBy && proposal.payload.applyBy !== fixture.expected.applyBy) failures.push(`applyBy ${proposal.payload.applyBy} ≠ ${fixture.expected.applyBy}`);
         if (fixture.expected.hasAssessment !== undefined && Boolean(proposal.payload.assessment) !== fixture.expected.hasAssessment) failures.push("assessment detail mismatch");
-        if (fixture.expected.hasInterview !== undefined && Boolean(proposal.payload.interview) !== fixture.expected.hasInterview) failures.push("interview detail mismatch");
+        if (fixture.expected.roundKind && proposal.payload.interviewRound?.kind !== fixture.expected.roundKind) failures.push(`round kind ${proposal.payload.interviewRound?.kind} ≠ ${fixture.expected.roundKind}`);
+        if (fixture.expected.roundStatus && proposal.payload.interviewRound?.status !== fixture.expected.roundStatus) failures.push(`round status ${proposal.payload.interviewRound?.status} ≠ ${fixture.expected.roundStatus}`);
+        if (fixture.expected.hasInterview !== undefined && Boolean(proposal.payload.interviewRound) !== fixture.expected.hasInterview) failures.push("interview detail mismatch");
 
         if (validateProposalEvidence(fixture.message, proposal).length > 0) {
           failures.push("evidence was not copied exactly from the source message");

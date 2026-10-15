@@ -132,7 +132,7 @@ export type Database = {
           job_drive_id: string | null
           company_name: string
           role_title: string | null
-          stage: string
+          kind: string
           starts_at: string | null
           timezone: string | null
           mode: string
@@ -143,7 +143,8 @@ export type Database = {
           calendar_sync_status: string
           created_at: string
           updated_at: string
-          round_summary: string | null
+          title: string
+          status: string
         }
         Insert: {
           id?: string
@@ -151,7 +152,7 @@ export type Database = {
           job_drive_id?: string | null
           company_name: string
           role_title?: string | null
-          stage?: string
+          kind?: string
           starts_at?: string | null
           timezone?: string | null
           mode?: string
@@ -162,7 +163,8 @@ export type Database = {
           calendar_sync_status?: string
           created_at?: string
           updated_at?: string
-          round_summary?: string | null
+          title?: string
+          status?: string
         }
         Update: {
           id?: string
@@ -170,7 +172,7 @@ export type Database = {
           job_drive_id?: string | null
           company_name?: string
           role_title?: string | null
-          stage?: string
+          kind?: string
           starts_at?: string | null
           timezone?: string | null
           mode?: string
@@ -181,7 +183,8 @@ export type Database = {
           calendar_sync_status?: string
           created_at?: string
           updated_at?: string
-          round_summary?: string | null
+          title?: string
+          status?: string
         }
         Relationships: [
           { foreignKeyName: "interviews_job_drive_owner_fkey"; columns: ["job_drive_id","user_id"]; isOneToOne: false; referencedRelation: "job_drives"; referencedColumns: ["id","user_id"] }
@@ -443,6 +446,13 @@ export type Database = {
         Returns: string
       }
       job_drive_json: {
+        Args: {
+          p_job_drive_id: string | null
+          p_user_id: string | null
+        }
+        Returns: Json
+      }
+      job_drive_rounds_json: {
         Args: {
           p_job_drive_id: string | null
           p_user_id: string | null

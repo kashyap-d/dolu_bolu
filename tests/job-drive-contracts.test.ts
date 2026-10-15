@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   assessmentDetailsSchema,
-  interviewSummarySchema,
+  interviewRoundSchema,
   jobDriveProgressPayloadSchema,
   jobDriveStageSchema,
 } from "../src/features/job-drives/contracts";
@@ -20,7 +20,7 @@ function payload() {
     sourceUrl: "https://careers.example/jobs/123",
     notes: null,
     assessment: null,
-    interview: null,
+    interviewRounds: [],
   };
 }
 
@@ -47,11 +47,23 @@ describe("Job Drive contracts", () => {
     assert.equal(result.success, false);
   });
 
-  it("requires a timezone only when an interview is scheduled", () => {
-    const base = { nextScheduledAt: "2026-09-18T10:00:00.000Z", timeZone: null, mode: "virtual", location: null, meetingUrl: null, roundSummary: null, notes: null };
-    assert.equal(interviewSummarySchema.safeParse(base).success, false);
-    assert.equal(interviewSummarySchema.safeParse({ ...base, nextScheduledAt: null }).success, true);
-    assert.equal(interviewSummarySchema.safeParse({ ...base, timeZone: "Mars/Olympus" }).success, false);
+  it("requires a timezone only for a scheduled interview round", () => {
+    const base = {
+      id: crypto.randomUUID(), title: "Technical 1", kind: "technical", status: "scheduled",
+      scheduledAt: "2026-09-16T05:30:00.000Z", timeZone: null, mode: "virtual",
+      location: null, meetingUrl: null, notes: null,
+    };
+    assert.equal(interviewRoundSchema.safeParse(base).success, false);
+    assert.equal(interviewRoundSchema.safeParse({ ...base, scheduledAt: null }).success, true);
+    assert.equal(interviewRoundSchema.safeParse({ ...base, timeZone: "Mars/Olympus" }).success, false);
+    assert.equal(interviewRoundSchema.safeParse({ ...base, timeZone: "Asia/Kolkata" }).success, true);
+    assert.equal(interviewRoundSchema.safeParse({ ...base, timeZone: "Asia/Kolkata", kind: "lunch" }).success, false);
+  });
+
+  it("caps a drive at ten interview rounds", () => {
+    const round = { title: "R", kind: "other", status: "scheduled", scheduledAt: null, timeZone: null, mode: "unknown", location: null, meetingUrl: null, notes: null };
+    const rounds = Array.from({ length: 11 }, () => ({ ...round, id: crypto.randomUUID() }));
+    assert.equal(jobDriveProgressPayloadSchema.safeParse({ ...payload(), interviewRounds: rounds }).success, false);
   });
 
   it("rejects non-HTTP URLs and malformed timestamps", () => {

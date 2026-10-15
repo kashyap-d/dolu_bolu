@@ -13,14 +13,14 @@ async function seed(tx: Tx) {
     companyName: "Acme", roleTitle: "Engineer", stage: "assessment", stageOccurredAt: null,
     appliedAt: "2026-10-01", applyBy: null, location: null, sourceUrl: null, notes: "private",
     assessment: { status: "invited", availableFrom: null, dueAt: null, durationMinutes: null, assessmentUrl: null, notes: null },
-    interview: { nextScheduledAt: null, timeZone: null, mode: "unknown", location: null, meetingUrl: null, roundSummary: "R1", notes: null },
+    interviewRounds: [{ id: crypto.randomUUID(), title: "R1", kind: "technical", status: "scheduled", scheduledAt: null, timeZone: null, mode: "unknown", location: null, meetingUrl: null, notes: null }],
   };
   await tx`select public.save_job_drive(gen_random_uuid(), null, ${tx.json(drive as never)}::jsonb, false, false)`;
   await tx`select public.consume_ai_request(5)`;
   await tx`
     select * from public.persist_job_drive_proposal(
       gen_random_uuid(), 'I applied to Acme', 'demo', 'model', 'draft:1', 'Record Acme',
-      ${tx.json({ ...drive, interview: null, assessment: null, jobDriveId: null, expectedUpdatedAt: null, isCorrection: false } as never)}::jsonb,
+      ${tx.json({ ...drive, interviewRounds: [], assessment: null, jobDriveId: null, expectedUpdatedAt: null, isCorrection: false } as never)}::jsonb,
       ${tx.json([{ fieldPath: "companyName", quote: "Acme" }] as never)}::jsonb, '[]'::jsonb)`;
 }
 

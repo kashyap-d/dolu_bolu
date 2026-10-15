@@ -8,13 +8,11 @@ import {
   validateProposalForConfirmation,
   type ProposalIssue,
 } from "@/features/assistant/validate-proposal";
-import type { JobDrive } from "@/features/job-drives/contracts";
+import { MAX_INTERVIEW_ROUNDS, type JobDrive } from "@/features/job-drives/contracts";
 import { matchingJobDrives } from "@/features/job-drives/matching";
 import { normalizeCompanyName, normalizeRoleTitle } from "@/features/job-drives/normalize";
-import {
-  mergeAssessmentDetails,
-  mergeInterviewSummary,
-} from "@/features/job-drives/merge-details";
+import { mergeAssessmentDetails } from "@/features/job-drives/merge-details";
+import { editableRounds, mergeProposedRound } from "@/features/job-drives/rounds";
 import { inferredStage } from "@/features/job-drives/stage-rules";
 
 export type ResolvedProposal =
@@ -101,6 +99,11 @@ export function resolveProposal(
       ? payload.stage
       : inferredStage(existing.stage, payload.stage);
 
+  const interviewRounds = mergeProposedRound(payload.interviewRound, editableRounds(existing?.interviewRounds ?? []));
+  if (interviewRounds.length > MAX_INTERVIEW_ROUNDS) {
+    return issue("interviewRound", `A drive can track up to ${MAX_INTERVIEW_ROUNDS} interview rounds. Remove one first.`);
+  }
+
   return {
     ok: true,
     payload: persistedJobDriveProgressPayloadSchema.parse({
@@ -120,7 +123,7 @@ export function resolveProposal(
       sourceUrl: payload.sourceUrl ?? existing?.sourceUrl ?? null,
       notes: payload.notes ?? existing?.notes ?? null,
       assessment: mergeAssessmentDetails(payload.assessment, existing?.assessment ?? null),
-      interview: mergeInterviewSummary(payload.interview, existing?.interview ?? null),
+      interviewRounds,
     }),
   };
 }

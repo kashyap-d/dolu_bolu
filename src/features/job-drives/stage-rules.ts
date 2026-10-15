@@ -76,7 +76,7 @@ export function importantDateForDrive(
   drive: {
     applyBy: string | null;
     assessment: { availableFrom: string | null; dueAt: string | null } | null;
-    interview: { nextScheduledAt: string | null } | null;
+    interviewRounds: ReadonlyArray<{ title: string; status: string; scheduledAt: string | null }>;
   },
   now = Date.now(),
 ): ImportantDate | null {
@@ -92,9 +92,10 @@ export function importantDateForDrive(
   if (assessmentDate) {
     candidates.push({ ...assessmentDate, allDay: false, at: new Date(assessmentDate.value).getTime() });
   }
-  if (drive.interview?.nextScheduledAt) {
-    const value = drive.interview.nextScheduledAt;
-    candidates.push({ label: "Interview", value, allDay: false, at: new Date(value).getTime() });
+  for (const round of drive.interviewRounds) {
+    if (round.status !== "scheduled" || !round.scheduledAt) continue;
+    const value = round.scheduledAt;
+    candidates.push({ label: round.title, value, allDay: false, at: new Date(value).getTime() });
   }
   if (candidates.length === 0) return null;
 

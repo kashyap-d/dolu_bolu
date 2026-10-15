@@ -28,8 +28,8 @@ type AssessmentRow = Pick<
 >;
 type InterviewRow = Pick<
   Tables["interviews"]["Row"],
-  | "job_drive_id" | "starts_at" | "timezone" | "mode" | "location" | "meeting_url"
-  | "round_summary" | "notes" | "updated_at"
+  | "id" | "job_drive_id" | "title" | "kind" | "status" | "starts_at" | "timezone" | "mode"
+  | "location" | "meeting_url" | "notes" | "updated_at"
 >;
 
 const driveColumns =
@@ -37,7 +37,7 @@ const driveColumns =
 const assessmentColumns =
   "job_drive_id, status, available_from, due_at, duration_minutes, assessment_url, notes, updated_at";
 const interviewColumns =
-  "job_drive_id, starts_at, timezone, mode, location, meeting_url, round_summary, notes, updated_at";
+  "id, job_drive_id, title, kind, status, starts_at, timezone, mode, location, meeting_url, notes, updated_at";
 
 /** Results of the save_job_drive RPC, which returns untyped JSON. */
 const saveJobDriveRpcSchema = z.union([
@@ -52,7 +52,7 @@ const saveJobDriveRpcSchema = z.union([
  * database stores as plain text (stages, statuses, dates) are still checked
  * against the domain contract on the way out.
  */
-function toJobDrive(row: DriveRow, assessment: AssessmentRow | null, interview: InterviewRow | null) {
+function toJobDrive(row: DriveRow, assessment: AssessmentRow | null, rounds: readonly InterviewRow[]) {
   const parsed = jobDriveSchema.safeParse({
     id: row.id,
     companyName: row.company_name,
@@ -73,16 +73,19 @@ function toJobDrive(row: DriveRow, assessment: AssessmentRow | null, interview: 
       notes: assessment.notes,
       updatedAt: assessment.updated_at,
     },
-    interview: interview && {
-      nextScheduledAt: interview.starts_at,
-      timeZone: interview.timezone,
-      mode: interview.mode,
-      location: interview.location,
-      meetingUrl: interview.meeting_url,
-      roundSummary: interview.round_summary,
-      notes: interview.notes,
-      updatedAt: interview.updated_at,
-    },
+    interviewRounds: rounds.map((round) => ({
+      id: round.id,
+      title: round.title,
+      kind: round.kind,
+      status: round.status,
+      scheduledAt: round.starts_at,
+      timeZone: round.timezone,
+      mode: round.mode,
+      location: round.location,
+      meetingUrl: round.meeting_url,
+      notes: round.notes,
+      updatedAt: round.updated_at,
+    })),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -102,21 +105,21 @@ async function loadDetails(supabase: AppSupabaseClient, userId: string, jobDrive
       .select(interviewColumns)
       .eq("user_id", userId)
       .in("job_drive_id", jobDriveIds)
-      .order("updated_at", { ascending: false }),
+      .order("starts_at", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
   ]);
   if (assessments.error || interviews.error) {
     throw new RepositoryError("Could not load Job Drive details.");
   }
 
   const assessmentByDrive = new Map(assessments.data.map((row) => [row.job_drive_id, row]));
-  // v1 shows one consolidated interview phase: the most recently updated row.
-  const interviewByDrive = new Map<string, InterviewRow>();
+  // Same order as job_drive_rounds_json: scheduled rounds by time, then the rest.
+  const roundsByDrive = new Map<string, InterviewRow[]>();
   for (const row of interviews.data) {
-    if (row.job_drive_id && !interviewByDrive.has(row.job_drive_id)) {
-      interviewByDrive.set(row.job_drive_id, row);
-    }
+    if (!row.job_drive_id) continue;
+    roundsByDrive.set(row.job_drive_id, [...(roundsByDrive.get(row.job_drive_id) ?? []), row]);
   }
-  return { assessmentByDrive, interviewByDrive };
+  return { assessmentByDrive, roundsByDrive };
 }
 
 export async function listJobDrives(supabase: AppSupabaseClient, userId: string): Promise<JobDrive[]> {
@@ -131,7 +134,7 @@ export async function listJobDrives(supabase: AppSupabaseClient, userId: string)
 
   const details = await loadDetails(supabase, userId, data.map((row) => row.id));
   return data.map((row) =>
-    toJobDrive(row, details.assessmentByDrive.get(row.id) ?? null, details.interviewByDrive.get(row.id) ?? null),
+    toJobDrive(row, details.assessmentByDrive.get(row.id) ?? null, details.roundsByDrive.get(row.id) ?? []),
   );
 }
 
@@ -153,7 +156,7 @@ export async function findJobDrive(
   return toJobDrive(
     data,
     details.assessmentByDrive.get(jobDriveId) ?? null,
-    details.interviewByDrive.get(jobDriveId) ?? null,
+    details.roundsByDrive.get(jobDriveId) ?? [],
   );
 }
 

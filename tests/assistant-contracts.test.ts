@@ -23,7 +23,7 @@ function draft(): ActionProposalDraft {
       sourceUrl: null,
       notes: null,
       assessment: { status: "invited", availableFrom: null, dueAt: null, durationMinutes: null, assessmentUrl: null, notes: null },
-      interview: null,
+      interviewRound: null,
     },
   };
 }
@@ -41,9 +41,10 @@ describe("Job Drive AI boundary", () => {
     assert.equal(actionProposalSchema.safeParse(draft()).success, false);
     const drive: Partial<ActionProposalDraft["payload"]> = { ...draft().payload };
     delete drive.jobDriveRef;
+    delete drive.interviewRound;
     assert.equal(actionProposalSchema.safeParse({
       ...draft(), id: crypto.randomUUID(), version: 1,
-      payload: { ...drive, jobDriveId: null, expectedUpdatedAt: null, isCorrection: false },
+      payload: { ...drive, interviewRounds: [], jobDriveId: null, expectedUpdatedAt: null, isCorrection: false },
     }).success, true);
   });
 

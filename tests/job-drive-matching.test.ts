@@ -8,7 +8,7 @@ function drive(overrides: Partial<JobDrive> = {}): JobDrive {
   return {
     id: crypto.randomUUID(), companyName: "Acme", roleTitle: "Backend Engineer", stage: "applied",
     stageOccurredAt: null, appliedAt: null, applyBy: null, location: null, sourceUrl: null,
-    notes: null, assessment: null, interview: null,
+    notes: null, assessment: null, interviewRounds: [],
     createdAt: "2026-09-15T10:00:00.000Z", updatedAt: "2026-09-15T10:00:00.000Z", ...overrides,
   };
 }

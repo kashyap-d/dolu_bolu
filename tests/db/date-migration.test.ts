@@ -37,3 +37,31 @@ describe("date-only migration", { skip: skipWithoutDatabase }, () => {
     assert.deepEqual(byUser.get(kolkata)?.updated_at, before!.updated_at, "conversion must not bump updated_at");
   });
 });
+
+describe("interview rounds migration", { skip: skipWithoutDatabase }, () => {
+  let db: TestDatabase;
+  before(async () => {
+    db = await createTestDatabase({ stopBefore: "20261016010000" });
+  });
+  after(async () => {
+    await db?.drop();
+  });
+
+  it("turns each consolidated interview into a titled round, keeping its summary in the notes", async () => {
+    const userId = await db.createUser();
+    const [drive] = await db.sql`
+      insert into public.job_drives (id, user_id, company_name, role_title, stage)
+      values (gen_random_uuid(), ${userId}, 'Acme', 'Engineer', 'interview') returning id`;
+    await db.sql`
+      insert into public.interviews (user_id, job_drive_id, company_name, stage, starts_at, timezone, mode, round_summary, notes)
+      values (${userId}, ${drive!.id}, 'Acme', 'other', '2020-01-01T10:00:00Z', 'UTC', 'virtual', 'R1 and R2 done', 'Ask about team')`;
+
+    await db.applyPendingMigrations();
+
+    const [round] = await db.sql`select title, kind, status, notes from public.interviews where job_drive_id = ${drive!.id}`;
+    assert.equal(round!.title, "Interview");
+    assert.equal(round!.kind, "other");
+    assert.equal(round!.status, "completed");
+    assert.equal(round!.notes, "R1 and R2 done\n\nAsk about team");
+  });
+});

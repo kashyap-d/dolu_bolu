@@ -52,6 +52,11 @@ test("adds a drive manually and records a backward move as a correction", async 
   await page.getByLabel("Company").fill("Globex");
   await page.getByLabel("Role", { exact: true }).fill("SDE 1");
   await page.getByRole("button", { name: /Interview/ }).first().click();
+  // Choosing the interview stage starts a first round to fill in.
+  await page.getByLabel("Round", { exact: true }).fill("Technical 1");
+  await page.getByLabel("Kind").selectOption("technical");
+  await page.getByRole("button", { name: "Add round" }).click();
+  await page.getByLabel("Round", { exact: true }).nth(1).fill("HR");
   await page.getByLabel(/Applied on/).fill("2026-10-01");
   await page.getByRole("button", { name: "Save Job Drive" }).click();
   await expect(page.getByText("Globex added.")).toBeVisible();
@@ -60,6 +65,9 @@ test("adds a drive manually and records a backward move as a correction", async 
   await page.getByRole("button", { name: /Globex/ }).click();
   // A date-only value must not move a day in any time zone.
   await expect(page.locator("p", { hasText: "Applied:" })).toContainText(/1 Oct 2026|Oct 1, 2026/);
+  const rounds = page.getByRole("region", { name: "Interview rounds" }).or(page.locator("section", { hasText: "Interview rounds" }));
+  await expect(rounds.getByText("Technical 1")).toBeVisible();
+  await expect(rounds.getByText("HR", { exact: true })).toBeVisible();
 
   await page.getByRole("group", { name: "Hiring stage" }).getByRole("button", { name: /Applied/ }).click();
   await expect(page.getByText("This will be recorded as an explicit correction.")).toBeVisible();

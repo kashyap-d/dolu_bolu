@@ -1,6 +1,7 @@
 import type { ActionProposal } from "@/features/assistant/contracts";
 
 import type { JobDrive, JobDriveProgressPayload } from "./contracts";
+import { editableRounds } from "./rounds";
 
 export const emptyJobDrivePayload: JobDriveProgressPayload = {
   companyName: "",
@@ -13,7 +14,7 @@ export const emptyJobDrivePayload: JobDriveProgressPayload = {
   sourceUrl: null,
   notes: null,
   assessment: null,
-  interview: null,
+  interviewRounds: [],
 };
 
 /** The editable fields of a stored drive, without record metadata. */
@@ -38,17 +39,7 @@ export function payloadFromDrive(drive: JobDrive): JobDriveProgressPayload {
           notes: drive.assessment.notes,
         }
       : null,
-    interview: drive.interview
-      ? {
-          nextScheduledAt: drive.interview.nextScheduledAt,
-          timeZone: drive.interview.timeZone,
-          mode: drive.interview.mode,
-          location: drive.interview.location,
-          meetingUrl: drive.interview.meetingUrl,
-          roundSummary: drive.interview.roundSummary,
-          notes: drive.interview.notes,
-        }
-      : null,
+    interviewRounds: editableRounds(drive.interviewRounds),
   };
 }
 
@@ -66,7 +57,7 @@ export function payloadFromProposal(proposal: ActionProposal): JobDriveProgressP
     sourceUrl: payload.sourceUrl,
     notes: payload.notes,
     assessment: payload.assessment,
-    interview: payload.interview,
+    interviewRounds: payload.interviewRounds,
   };
 }
 

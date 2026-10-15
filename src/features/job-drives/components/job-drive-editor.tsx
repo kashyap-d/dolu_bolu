@@ -12,12 +12,14 @@ import {
   jobDriveProgressPayloadSchema,
   type AssessmentDetails,
   type ConfirmJobDriveResponse,
-  type InterviewSummary,
+  type InterviewRound,
   type JobDriveProgressPayload,
   type JobDriveStage,
   type SaveJobDriveResponse,
 } from "../contracts";
 import { isBackwardStageChange } from "../stage-rules";
+import { toIsoOrNull, toLocalDateTime } from "./datetime-input";
+import { InterviewRoundsFields, newInterviewRound } from "./interview-rounds-fields";
 import { StageBar } from "./stage-bar";
 
 interface JobDriveEditorProps {
@@ -48,16 +50,6 @@ const emptyAssessment: AssessmentDetails = {
   notes: null,
 };
 
-const emptyInterview: InterviewSummary = {
-  nextScheduledAt: null,
-  timeZone: null,
-  mode: "unknown",
-  location: null,
-  meetingUrl: null,
-  roundSummary: null,
-  notes: null,
-};
-
 const assessmentStatuses: AssessmentDetails["status"][] = [
   "invited",
   "scheduled",
@@ -66,25 +58,8 @@ const assessmentStatuses: AssessmentDetails["status"][] = [
   "failed",
   "cancelled",
 ];
-const interviewModes: InterviewSummary["mode"][] = ["unknown", "virtual", "phone", "onsite"];
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-
-/** ISO timestamp → value for <input type="datetime-local"> in the browser's zone. */
-function toLocalDateTime(value: string | null | undefined) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-}
-
-/** datetime-local value → ISO timestamp; "invalid" lets schema validation flag it. */
-function toIsoOrNull(value: string) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "invalid" : date.toISOString();
-}
 
 const trimmedOrNull = (value: string | null | undefined) => value?.trim() || null;
 
@@ -120,7 +95,7 @@ export function JobDriveEditor({
   const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl ?? "");
   const [notes, setNotes] = useState(initial.notes ?? "");
   const [assessment, setAssessment] = useState<AssessmentDetails | null>(initial.assessment);
-  const [interview, setInterview] = useState<InterviewSummary | null>(initial.interview);
+  const [rounds, setRounds] = useState<InterviewRound[]>(initial.interviewRounds);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [requestError, setRequestError] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[] | null>(null);
@@ -128,7 +103,6 @@ export function JobDriveEditor({
 
   const correction = Boolean(existingStage && isBackwardStageChange(existingStage, stage));
   const assessmentValue = assessment ?? emptyAssessment;
-  const interviewValue = interview ?? emptyInterview;
   const busy = Boolean(pendingAction);
 
   function selectStage(next: JobDriveStage) {
@@ -136,12 +110,7 @@ export function JobDriveEditor({
     setStage(next);
     setStageOccurredAt("");
     if (next === "assessment" && !assessment) setAssessment(emptyAssessment);
-    if (next === "interview" && !interview) {
-      setInterview({
-        ...emptyInterview,
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      });
-    }
+    if (next === "interview" && rounds.length === 0) setRounds([newInterviewRound(1)]);
   }
 
   function candidate() {
@@ -163,16 +132,14 @@ export function JobDriveEditor({
             notes: trimmedOrNull(assessment.notes),
           }
         : null,
-      interview: interview
-        ? {
-            ...interview,
-            timeZone: trimmedOrNull(interview.timeZone),
-            location: trimmedOrNull(interview.location),
-            meetingUrl: trimmedOrNull(interview.meetingUrl),
-            roundSummary: trimmedOrNull(interview.roundSummary),
-            notes: trimmedOrNull(interview.notes),
-          }
-        : null,
+      interviewRounds: rounds.map((round) => ({
+        ...round,
+        title: round.title.trim(),
+        timeZone: trimmedOrNull(round.timeZone),
+        location: trimmedOrNull(round.location),
+        meetingUrl: trimmedOrNull(round.meetingUrl),
+        notes: trimmedOrNull(round.notes),
+      })),
     });
   }
 
@@ -376,68 +343,8 @@ export function JobDriveEditor({
             </Section>
           ) : null}
 
-          {stage === "interview" ? (
-            <Section title="Interview phase">
-              <Field error={fieldErrors["interview.nextScheduledAt"]} label="Next interview" optional>
-                <TextInput
-                  invalid={Boolean(fieldErrors["interview.nextScheduledAt"])}
-                  onChange={(event) =>
-                    setInterview({ ...interviewValue, nextScheduledAt: toIsoOrNull(event.target.value) })
-                  }
-                  type="datetime-local"
-                  value={toLocalDateTime(interviewValue.nextScheduledAt)}
-                />
-              </Field>
-              <Field error={fieldErrors["interview.timeZone"]} label="Time zone" optional>
-                <TextInput
-                  invalid={Boolean(fieldErrors["interview.timeZone"])}
-                  maxLength={80}
-                  onChange={(event) => setInterview({ ...interviewValue, timeZone: event.target.value || null })}
-                  placeholder="Asia/Kolkata"
-                  value={interviewValue.timeZone ?? ""}
-                />
-              </Field>
-              <Field label="Mode">
-                <Select
-                  onChange={(event) =>
-                    setInterview({ ...interviewValue, mode: event.target.value as InterviewSummary["mode"] })
-                  }
-                  value={interviewValue.mode}
-                >
-                  {interviewModes.map((value) => (
-                    <option key={value} value={value}>{capitalize(value)}</option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Location" optional>
-                <TextInput
-                  onChange={(event) => setInterview({ ...interviewValue, location: event.target.value || null })}
-                  value={interviewValue.location ?? ""}
-                />
-              </Field>
-              <Field className="sm:col-span-2" error={fieldErrors["interview.meetingUrl"]} label="Meeting link" optional>
-                <TextInput
-                  invalid={Boolean(fieldErrors["interview.meetingUrl"])}
-                  onChange={(event) => setInterview({ ...interviewValue, meetingUrl: event.target.value || null })}
-                  type="url"
-                  value={interviewValue.meetingUrl ?? ""}
-                />
-              </Field>
-              <Field className="sm:col-span-2" label="Rounds so far" optional>
-                <TextArea
-                  maxLength={1000}
-                  onChange={(event) => setInterview({ ...interviewValue, roundSummary: event.target.value || null })}
-                  value={interviewValue.roundSummary ?? ""}
-                />
-              </Field>
-              <Field className="sm:col-span-2" label="Interview notes" optional>
-                <TextArea
-                  maxLength={2000}
-                  onChange={(event) => setInterview({ ...interviewValue, notes: event.target.value || null })}
-                  value={interviewValue.notes ?? ""}
-                />
-              </Field>
-            </Section>
+          {stage === "interview" || rounds.length > 0 ? (
+            <InterviewRoundsFields disabled={busy} errors={fieldErrors} onChange={setRounds} rounds={rounds} />
           ) : null}
 
           <Field className="sm:col-span-2" label="Notes" optional>

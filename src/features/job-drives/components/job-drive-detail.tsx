@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { LocalDate, LocalDateTime } from "@/components/ui/local-date-time";
 
-import type { ActivityEvent, JobDrive, JobDriveStage } from "../contracts";
+import type { ActivityEvent, InterviewRound, JobDrive, JobDriveStage } from "../contracts";
+import { roundKindLabels } from "../rounds";
 import { stageLabel } from "../stage-rules";
 import { StageBar } from "./stage-bar";
 
@@ -33,6 +34,52 @@ function ExternalAnchor({ href, children }: { href: string; children: ReactNode 
     <a className="inline-flex items-center gap-1.5 font-semibold text-brand-text underline-offset-2 hover:underline" href={href} rel="noreferrer" target="_blank">
       {children} <ExternalLink aria-hidden="true" size={13} />
     </a>
+  );
+}
+
+const statusTones: Record<InterviewRound["status"], string> = {
+  scheduled: "bg-brand-soft text-brand-text",
+  completed: "bg-success-soft text-success-ink",
+  cancelled: "bg-surface-muted text-subtle line-through",
+};
+
+function InterviewRoundsList({ rounds }: { rounds: JobDrive["interviewRounds"] }) {
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5">
+      <h2 className="font-display text-sm font-semibold text-ink-soft">Interview rounds</h2>
+      {rounds.length ? (
+        <ol className="mt-3 divide-y divide-line">
+          {rounds.map((round) => (
+            <li className="flex flex-col gap-1 py-3 text-xs leading-5 text-muted sm:flex-row sm:items-start sm:gap-4" key={round.id}>
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-ink-soft">{round.title}</span>
+                  <span className="text-subtle">{roundKindLabels[round.kind]}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusTones[round.status]}`}>
+                    {round.status}
+                  </span>
+                </p>
+                <p className="flex flex-wrap items-center gap-x-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarClock aria-hidden="true" size={13} />
+                    <LocalDateTime fallback="Time not set" value={round.scheduledAt} />
+                    {round.scheduledAt && round.timeZone ? <span className="text-subtle">({round.timeZone})</span> : null}
+                  </span>
+                  {round.mode !== "unknown" ? <span>{round.mode}</span> : null}
+                  {round.location ? (
+                    <span className="inline-flex items-center gap-1"><MapPin aria-hidden="true" size={13} /> {round.location}</span>
+                  ) : null}
+                </p>
+                {round.notes ? <p className="mt-1 whitespace-pre-wrap">{round.notes}</p> : null}
+              </div>
+              {round.meetingUrl ? <ExternalAnchor href={round.meetingUrl}>Join</ExternalAnchor> : null}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-3 text-xs text-muted">No interview rounds recorded.</p>
+      )}
+    </section>
   );
 }
 
@@ -81,7 +128,7 @@ export function JobDriveDetail({
         </p>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <SummaryCard title="Drive details">
           <Row label="Stage reached"><LocalDateTime value={drive.stageOccurredAt} /></Row>
           <Row label="Applied"><LocalDate value={drive.appliedAt} /></Row>
@@ -110,22 +157,9 @@ export function JobDriveDetail({
             <p>No assessment details recorded.</p>
           )}
         </SummaryCard>
-        <SummaryCard title="Interview phase">
-          {drive.interview ? (
-            <>
-              <Row label="Next interview"><LocalDateTime value={drive.interview.nextScheduledAt} /></Row>
-              <Row label="Time zone">{drive.interview.timeZone ?? "Unknown"}</Row>
-              <Row label="Mode">{drive.interview.mode}</Row>
-              {drive.interview.roundSummary ? <Row label="Rounds">{drive.interview.roundSummary}</Row> : null}
-              {drive.interview.meetingUrl ? (
-                <ExternalAnchor href={drive.interview.meetingUrl}>Open meeting</ExternalAnchor>
-              ) : null}
-            </>
-          ) : (
-            <p>No interview details recorded.</p>
-          )}
-        </SummaryCard>
       </div>
+
+      <InterviewRoundsList rounds={drive.interviewRounds} />
 
       {drive.notes ? (
         <section className="rounded-2xl border border-line bg-surface p-5">

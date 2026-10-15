@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { jobDriveProgressPayloadSchema } from "@/features/job-drives/contracts";
+import { interviewRoundFields, jobDriveProgressPayloadSchema } from "@/features/job-drives/contracts";
 
 export const evidenceSchema = z
   .object({
@@ -51,7 +51,14 @@ export const providerJobDrivePayloadSchema = z
       .max(160)
       .nullable()
       .describe("As written in the message. Null only when jobDriveRef is set; otherwise ask instead."),
-    ...jobDriveProgressPayloadSchema.omit({ companyName: true, roleTitle: true }).shape,
+    ...jobDriveProgressPayloadSchema.omit({ companyName: true, roleTitle: true, interviewRounds: true }).shape,
+    interviewRound: z
+      .object(interviewRoundFields)
+      .strict()
+      .nullable()
+      .describe(
+        "The one interview round this message is about, or null. Trusted code merges it into the drive's existing rounds.",
+      ),
   })
   .strict();
 
