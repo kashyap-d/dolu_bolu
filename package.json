@@ -11,9 +11,12 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "node --conditions=react-server --import tsx --test tests/**/*.test.ts",
-    "test:watch": "node --conditions=react-server --import tsx --test --watch tests/**/*.test.ts",
-    "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts"
+    "test": "node --conditions=react-server --import tsx --test 'tests/*.test.ts'",
+    "test:watch": "node --conditions=react-server --import tsx --test --watch 'tests/*.test.ts'",
+    "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts",
+    "test:db": "scripts/with-test-db.sh node --conditions=react-server --import tsx --test --test-concurrency=1 'tests/db/*.test.ts'",
+    "db:types": "scripts/with-test-db.sh node --import tsx scripts/generate-db-types.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -26,12 +29,14 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "postgres": "^3.4.9",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5"
