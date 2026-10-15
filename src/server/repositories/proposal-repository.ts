@@ -12,7 +12,7 @@ import {
   confirmJobDriveResponseSchema,
   type JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
-import { RepositoryError } from "@/server/repositories/errors";
+import { invalidStoredData, RepositoryError } from "@/server/repositories/errors";
 import type { AppSupabaseClient } from "@/server/supabase/server";
 
 const proposalColumns = "id, kind, version, status, summary, payload, evidence, assumptions";
@@ -47,7 +47,7 @@ function toProposal(row: {
     evidence: row.evidence,
     assumptions: row.assumptions,
   });
-  if (!parsed.success) throw new RepositoryError("Stored proposal data is invalid.");
+  if (!parsed.success) throw invalidStoredData("proposal data", parsed.error);
   return parsed.data;
 }
 

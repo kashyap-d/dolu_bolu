@@ -11,7 +11,7 @@ import {
   type JobDrive,
   type JobDriveProgressPayload,
 } from "@/features/job-drives/contracts";
-import { RepositoryError } from "@/server/repositories/errors";
+import { invalidStoredData, RepositoryError } from "@/server/repositories/errors";
 import type { Database } from "@/server/supabase/database.types";
 import type { AppSupabaseClient } from "@/server/supabase/server";
 
@@ -86,7 +86,7 @@ function toJobDrive(row: DriveRow, assessment: AssessmentRow | null, interview: 
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
-  if (!parsed.success) throw new RepositoryError("Stored Job Drive data is invalid.");
+  if (!parsed.success) throw invalidStoredData("Job Drive data", parsed.error);
   return parsed.data;
 }
 
@@ -184,7 +184,7 @@ export async function listJobDriveActivity(
       occurredAt: metadata.occurredAt,
       createdAt: row.created_at,
     });
-    if (!parsed.success) throw new RepositoryError("Stored activity history is invalid.");
+    if (!parsed.success) throw invalidStoredData("activity history", parsed.error);
     return parsed.data;
   });
 }
