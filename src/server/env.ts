@@ -4,6 +4,9 @@ import { z } from "zod";
 
 const supabaseProjectUrlSchema = z.url().refine(
   (value) => {
+    // Refinements run even when z.url() failed; an empty or invalid value
+    // must mean "not configured", not an exception on every request.
+    if (!URL.canParse(value)) return false;
     const url = new URL(value);
     return (
       ["http:", "https:"].includes(url.protocol) &&
@@ -62,6 +65,25 @@ export function getAiProviderName() {
 
   if (!parsed.success) {
     throw new Error("AI_PROVIDER must be either demo or gemini.");
+  }
+
+  return parsed.data;
+}
+
+const aiDailyRequestLimitSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(1_000)
+  .default(50);
+
+export function getAiDailyRequestLimit() {
+  const parsed = aiDailyRequestLimitSchema.safeParse(
+    process.env.AI_DAILY_REQUEST_LIMIT || undefined,
+  );
+
+  if (!parsed.success) {
+    throw new Error("AI_DAILY_REQUEST_LIMIT must be an integer from 1 to 1000.");
   }
 
   return parsed.data;

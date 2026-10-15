@@ -1,0 +1,23 @@
+import { expect, test as base } from "@playwright/test";
+
+/**
+ * Every test fails on browser console errors or uncaught page errors. This is
+ * how hydration mismatches surface (React logs them as recoverable errors),
+ * and they are easy to miss by eye.
+ */
+export const test = base.extend<{ consoleErrors: string[] }>({
+  consoleErrors: [
+    async ({ page }, use) => {
+      const errors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      page.on("pageerror", (error) => errors.push(error.message));
+      await use(errors);
+      expect(errors, "browser console errors").toEqual([]);
+    },
+    { auto: true },
+  ],
+});
+
+export { expect };

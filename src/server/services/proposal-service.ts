@@ -1,23 +1,30 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   assistantResponseSchema,
   providerResponseSchema,
   type AssistantRequest,
   type AssistantResponse,
 } from "@/features/assistant/contracts";
-import {
-  validateProposalEvidence,
-  validateProposalForConfirmation,
-} from "@/features/assistant/validate-proposal";
+import { selectModelContext } from "@/features/assistant/model-context";
+import { redactContactDetails } from "@/features/assistant/redact";
+import { resolveProposal } from "@/features/assistant/resolve-proposal";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
-import { listApplicationContext } from "@/server/repositories/application-repository";
+import { getAiDailyRequestLimit } from "@/server/env";
+import { consumeAiRequest } from "@/server/repositories/ai-usage-repository";
+import { listJobDrives } from "@/server/repositories/job-drive-repository";
 import {
   findProposalByClientRequest,
-  persistApplicationProposal,
+  persistProposal,
 } from "@/server/repositories/proposal-repository";
+import type { AppSupabaseClient } from "@/server/supabase/server";
+
+export class AiQuotaExceededError extends Error {
+  constructor(readonly limit: number) {
+    super("The daily assistant limit has been reached.");
+    this.name = "AiQuotaExceededError";
+  }
+}
 
 export class ClientRequestConflictError extends Error {
   constructor() {
@@ -27,143 +34,117 @@ export class ClientRequestConflictError extends Error {
 }
 
 interface PersistenceContext {
-  supabase: SupabaseClient;
+  supabase: AppSupabaseClient;
   userId: string;
 }
 
-export async function prepareActionProposals(
+async function replayedResponse(
+  persistence: PersistenceContext,
   request: AssistantRequest,
+): Promise<AssistantResponse | null> {
+  const replay = await findProposalByClientRequest(
+    persistence.supabase,
+    persistence.userId,
+    request.clientRequestId,
+  );
+  if (!replay) return null;
+  if (replay.batch.source_message !== request.message) {
+    throw new ClientRequestConflictError();
+  }
+
+  const metadata = {
+    provider: replay.batch.provider,
+    model: replay.batch.model,
+    latencyMs: 0,
+    isDemo: replay.batch.provider === "demo",
+  };
+  if (replay.status === "pending") {
+    return { decision: { kind: "proposal", proposal: replay.proposal }, metadata };
+  }
+  return {
+    decision: {
+      kind: "unsupported",
+      message:
+        replay.status === "executed"
+          ? "This update has already been confirmed and is in your Drives workspace."
+          : "This update is no longer pending. Send a new message to prepare another change.",
+    },
+    metadata,
+  };
+}
+
+/**
+ * message → provider → shared schema → deterministic resolution → pending
+ * proposal. Without persistence (the local preview) the same pipeline runs
+ * against no stored drives and returns an unsaved proposal.
+ */
+export async function prepareProposal(
+  original: AssistantRequest,
   persistence: PersistenceContext | null,
 ): Promise<AssistantResponse> {
+  // Everything downstream (replay check, provider, evidence, storage) sees the
+  // same text, with contact details already removed.
+  const request = { ...original, message: redactContactDetails(original.message) };
   if (persistence) {
-    const existing = await findProposalByClientRequest(
-      persistence.supabase,
-      persistence.userId,
-      request.clientRequestId,
-    );
+    const replay = await replayedResponse(persistence, request);
+    if (replay) return assistantResponseSchema.parse(replay);
+  }
 
-    if (existing) {
-      if (existing.batch.source_message !== request.message) {
-        throw new ClientRequestConflictError();
-      }
-
-      if (existing.status !== "pending") {
-        return assistantResponseSchema.parse({
-          decision: {
-            kind: "unsupported",
-            message:
-              existing.status === "executed"
-                ? "This request has already been confirmed and is in your Applications workspace."
-                : "This request is no longer pending. Send a new message to prepare another application.",
-          },
-          metadata: {
-            provider: existing.batch.provider,
-            model: existing.batch.model,
-            latencyMs: 0,
-            isDemo: existing.batch.provider === "demo",
-          },
-        });
-      }
-
-      return assistantResponseSchema.parse({
-        decision: {
-          kind: "proposals",
-          batchId: existing.batch.id,
-          proposals: [existing.proposal],
-        },
-        metadata: {
-          provider: existing.batch.provider,
-          model: existing.batch.model,
-          latencyMs: 0,
-          isDemo: existing.batch.provider === "demo",
-        },
-      });
+  const drives = persistence
+    ? await listJobDrives(persistence.supabase, persistence.userId)
+    : [];
+  const provider = getActionProposalProvider({ allowHosted: Boolean(persistence) });
+  if (persistence && !provider.isDemo) {
+    const usage = await consumeAiRequest(persistence.supabase, getAiDailyRequestLimit());
+    if (usage.outcome === "limit_reached") throw new AiQuotaExceededError(usage.limit);
+    if (usage.outcome !== "allowed") {
+      throw new Error("The AI request allowance could not be reserved.");
     }
   }
 
-  const context = persistence
-    ? await listApplicationContext(persistence.supabase, persistence.userId)
-    : [];
-  const provider = getActionProposalProvider();
-  const rawProviderResult = await provider.propose({
-    message: request.message,
-    now: new Date().toISOString(),
-    timeZone: request.timeZone,
-    locale: request.locale,
-    context: { applications: context },
-  });
-  const providerResult = providerResponseSchema.parse(rawProviderResult);
-
-  if (providerResult.decision.kind !== "proposals") {
-    return assistantResponseSchema.parse({
-      decision: providerResult.decision,
-      metadata: providerResult.metadata,
-    });
+  const { decision, metadata } = providerResponseSchema.parse(
+    await provider.propose({
+      message: request.message,
+      now: new Date().toISOString(),
+      timeZone: request.timeZone,
+      locale: request.locale,
+      context: { jobDrives: selectModelContext(request.message, drives) },
+    }),
+  );
+  if (decision.kind !== "proposal") {
+    return assistantResponseSchema.parse({ decision, metadata });
   }
 
-  const issues = providerResult.decision.proposals.flatMap((proposal) => [
-    ...validateProposalEvidence(request.message, proposal),
-    ...validateProposalForConfirmation(proposal),
-  ]);
-
-  if (issues.length > 0) {
+  const resolved = resolveProposal(request.message, decision.proposal, drives);
+  if (!resolved.ok) {
     return assistantResponseSchema.parse({
       decision: {
         kind: "needs_clarification",
-        question: issues.map((issue) => issue.message).join(" "),
-        missingFields: [...new Set(issues.map((issue) => issue.fieldPath))],
+        question: resolved.issues.map((issue) => issue.message).join(" "),
+        missingFields: [...new Set(resolved.issues.map((issue) => issue.fieldPath))],
       },
-      metadata: providerResult.metadata,
+      metadata,
     });
   }
 
-  if (persistence) {
-    const applicationProposals = providerResult.decision.proposals.filter(
-      (proposal) => proposal.kind === "create_application",
-    );
-
-    if (
-      applicationProposals.length !== 1 ||
-      providerResult.decision.proposals.length !== 1
-    ) {
-      return assistantResponseSchema.parse({
-        decision: {
-          kind: "unsupported",
-          message:
-            "Durable application capture is available now. Interview and task workflows are coming next.",
-        },
-        metadata: providerResult.metadata,
-      });
-    }
-
-    const persisted = await persistApplicationProposal(persistence.supabase, {
-      clientRequestId: request.clientRequestId,
-      sourceMessage: request.message,
-      provider: providerResult.metadata.provider,
-      model: providerResult.metadata.model,
-      proposal: applicationProposals[0],
-    });
-
-    return assistantResponseSchema.parse({
-      decision: {
-        kind: "proposals",
-        batchId: persisted.batchId,
-        proposals: [persisted.proposal],
-      },
-      metadata: providerResult.metadata,
-    });
-  }
-
-  return assistantResponseSchema.parse({
-    decision: {
-      kind: "proposals",
-      batchId: crypto.randomUUID(),
-      proposals: providerResult.decision.proposals.map((proposal) => ({
-        ...proposal,
+  const proposal = persistence
+    ? await persistProposal(persistence.supabase, {
+        clientRequestId: request.clientRequestId,
+        sourceMessage: request.message,
+        provider: metadata.provider,
+        model: metadata.model,
+        proposal: decision.proposal,
+        payload: resolved.payload,
+      })
+    : {
+        ...decision.proposal,
         id: crypto.randomUUID(),
         version: 1,
-      })),
-    },
-    metadata: providerResult.metadata,
+        payload: resolved.payload,
+      };
+
+  return assistantResponseSchema.parse({
+    decision: { kind: "proposal", proposal },
+    metadata,
   });
 }

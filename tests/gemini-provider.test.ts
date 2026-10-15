@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { z } from "zod";
+
+import { providerDecisionSchema } from "../src/features/assistant/contracts";
 import { AiProviderError } from "../src/server/ai/action-proposal-provider";
 import {
   GeminiActionProposalProvider,
+  toGeminiSchema,
   type GeminiProviderConfig,
 } from "../src/server/ai/providers/gemini";
 
@@ -19,7 +23,7 @@ const input = {
   now: "2026-09-15T12:00:00.000Z",
   timeZone: "Asia/Kolkata",
   locale: "en-IN",
-  context: { applications: [] },
+  context: { jobDrives: [] },
 };
 
 function successfulResponse() {
@@ -31,27 +35,32 @@ function successfulResponse() {
             parts: [
               {
                 text: JSON.stringify({
-                  kind: "proposals",
-                  proposals: [
+                  kind: "proposal",
+                  proposal:
                     {
-                      ref: "draft:1",
-                      kind: "create_application",
-                      summary: "Record Frontend Engineer application at Acme",
+                      kind: "record_job_drive_progress",
+                      summary: "Move Acme · Frontend Engineer to Applied",
                       evidence: [
                         { fieldPath: "companyName", quote: "Acme" },
                         { fieldPath: "roleTitle", quote: "Frontend Engineer" },
                       ],
                       assumptions: ["Yesterday was resolved using the supplied time."],
                       payload: {
+                        jobDriveRef: null,
+                        isCorrection: false,
                         companyName: "Acme",
                         roleTitle: "Frontend Engineer",
-                        status: "applied",
-                        appliedAt: "2026-09-14T12:00:00.000Z",
+                        stage: "applied",
+                        stageOccurredAt: "2026-09-14T12:00:00.000Z",
+                        appliedAt: "2026-09-14",
+                        applyBy: null,
+                        location: null,
                         sourceUrl: null,
                         notes: null,
+                        assessment: null,
+                        interviewRound: null,
                       },
                     },
-                  ],
                 }),
               },
             ],
@@ -79,7 +88,7 @@ describe("Gemini action proposal provider", () => {
 
     assert.equal(apiKey, "test-key");
     assert.equal(result.metadata.provider, "gemini");
-    assert.equal(result.decision.kind, "proposals");
+    assert.equal(result.decision.kind, "proposal");
     assert.equal(
       typeof requestBody === "object" && requestBody !== null,
       true,
@@ -117,7 +126,7 @@ describe("Gemini action proposal provider", () => {
       new Response(
         JSON.stringify({
           candidates: [
-            { content: { parts: [{ text: '{"kind":"proposals"}' }] } },
+            { content: { parts: [{ text: '{"kind":"proposal"}' }] } },
           ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -130,5 +139,19 @@ describe("Gemini action proposal provider", () => {
       assert.equal(error.code, "INVALID_OUTPUT");
       return true;
     });
+  });
+});
+
+describe("Gemini response schema", () => {
+  const schema = JSON.stringify(toGeminiSchema(z.toJSONSchema(providerDecisionSchema)));
+
+  it("is derived from the shared contract in Gemini's supported subset", () => {
+    for (const unsupported of ['"oneOf"', '"const"', '"pattern"', '"$schema"']) {
+      assert.equal(schema.includes(unsupported), false, unsupported);
+    }
+    assert.match(schema, /"enum":\["proposal"\]/);
+    assert.match(schema, /"appliedAt":\{"type":\["string","null"\],"format":"date"\}/);
+    assert.match(schema, /"assessment":\{"type":\["object","null"\]/);
+    assert.match(schema, /exact, case-sensitive substring/);
   });
 });

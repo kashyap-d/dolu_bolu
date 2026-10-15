@@ -1,8 +1,12 @@
-import { CommandCenter } from "@/features/assistant/components/command-center";
-import { isSupabaseConfigured } from "@/server/env";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
-export default function Home() {
+import { PreviewWorkspace } from "@/features/workspace/preview-workspace";
+import { isSupabaseConfigured } from "@/server/env";
+
+export default async function Home() {
+  // Decide per request: the build environment may not match the runtime one.
+  await connection();
   if (isSupabaseConfigured()) redirect("/app");
-  return <CommandCenter />;
+  return <PreviewWorkspace />;
 }

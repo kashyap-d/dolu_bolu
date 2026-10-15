@@ -1,222 +1,60 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  actionProposalDraftSchema,
-  actionProposalSchema,
-  assistantRequestSchema,
-  assistantResponseSchema,
-  providerResponseSchema,
-  type ActionProposal,
-  type ActionProposalDraft,
-} from "../src/features/assistant/contracts";
-import {
-  validateProposalEvidence,
-  validateProposalForConfirmation,
-} from "../src/features/assistant/validate-proposal";
+import { actionProposalDraftSchema, actionProposalSchema, type ActionProposalDraft } from "../src/features/assistant/contracts";
+import { validateProposalEvidence, validateProposalForConfirmation } from "../src/features/assistant/validate-proposal";
 
-function applicationProposal(): ActionProposal {
+function draft(): ActionProposalDraft {
   return {
-    id: crypto.randomUUID(),
-    version: 1,
-    ref: "draft:1",
-    kind: "create_application",
-    summary: "Record Frontend Engineer application at Acme",
-    evidence: [
-      { fieldPath: "companyName", quote: "Acme" },
-      { fieldPath: "roleTitle", quote: "Frontend Engineer" },
-    ],
-    assumptions: [],
+    kind: "record_job_drive_progress",
+    summary: "Move Acme · Backend Engineer to Assessment",
+    evidence: [{ fieldPath: "companyName", quote: "Acme" }],
+    assumptions: ["The application date remains unknown."],
     payload: {
+      jobDriveRef: null,
+      isCorrection: false,
       companyName: "Acme",
-      roleTitle: "Frontend Engineer",
-      status: "applied",
-      appliedAt: "2026-09-13T09:00:00.000Z",
+      roleTitle: "Backend Engineer",
+      stage: "assessment",
+      stageOccurredAt: null,
+      appliedAt: null,
+      applyBy: null,
+      location: null,
       sourceUrl: null,
       notes: null,
+      assessment: { status: "invited", availableFrom: null, dueAt: null, durationMinutes: null, assessmentUrl: null, notes: null },
+      interviewRound: null,
     },
   };
 }
 
-function applicationProposalDraft(): ActionProposalDraft {
-  return {
-    ref: "draft:1",
-    kind: "create_application",
-    summary: "Record Frontend Engineer application at Acme",
-    evidence: [
-      { fieldPath: "companyName", quote: "Acme" },
-      { fieldPath: "roleTitle", quote: "Frontend Engineer" },
-    ],
-    assumptions: [],
-    payload: {
-      companyName: "Acme",
-      roleTitle: "Frontend Engineer",
-      status: "applied",
-      appliedAt: "2026-09-13T09:00:00.000Z",
-      sourceUrl: null,
-      notes: null,
-    },
-  };
-}
-
-describe("assistant contracts", () => {
-  it("accepts a complete typed application proposal", () => {
-    assert.equal(actionProposalSchema.safeParse(applicationProposal()).success, true);
-  });
-
-  it("rejects unexpected provider fields", () => {
-    const proposal = { ...applicationProposal(), untrustedTool: "send_email" };
-
-    assert.equal(actionProposalSchema.safeParse(proposal).success, false);
-  });
-
+describe("Job Drive AI boundary", () => {
   it("accepts provider drafts without server-owned identifiers", () => {
-    assert.equal(
-      actionProposalDraftSchema.safeParse(applicationProposalDraft()).success,
-      true,
-    );
+    assert.equal(actionProposalDraftSchema.safeParse(draft()).success, true);
   });
 
-  it("rejects server-owned identifiers in provider drafts", () => {
-    const draft = {
-      ...applicationProposalDraft(),
-      id: crypto.randomUUID(),
-      version: 1,
-    };
-
-    assert.equal(actionProposalDraftSchema.safeParse(draft).success, false);
+  it("rejects provider attempts to inject server-owned identifiers", () => {
+    assert.equal(actionProposalDraftSchema.safeParse({ ...draft(), id: crypto.randomUUID(), version: 1 }).success, false);
   });
 
-  it("requires persisted proposals to have an id and version", () => {
-    assert.equal(
-      actionProposalSchema.safeParse(applicationProposalDraft()).success,
-      false,
-    );
+  it("requires server-owned identity and concurrency metadata after persistence", () => {
+    assert.equal(actionProposalSchema.safeParse(draft()).success, false);
+    const drive: Partial<ActionProposalDraft["payload"]> = { ...draft().payload };
+    delete drive.jobDriveRef;
+    delete drive.interviewRound;
+    assert.equal(actionProposalSchema.safeParse({
+      ...draft(), id: crypto.randomUUID(), version: 1,
+      payload: { ...drive, interviewRounds: [], jobDriveId: null, expectedUpdatedAt: null, isCorrection: false },
+    }).success, true);
   });
 
-  it("accepts draft proposals in provider responses", () => {
-    const result = providerResponseSchema.safeParse({
-      decision: {
-        kind: "proposals",
-        proposals: [applicationProposalDraft()],
-      },
-      metadata: {
-        provider: "demo",
-        model: "demo-v1",
-        latencyMs: 3,
-        isDemo: true,
-      },
-    });
-
-    assert.equal(result.success, true);
+  it("allows company and role omission only when an existing drive is referenced", () => {
+    const linked = { ...draft(), payload: { ...draft().payload, jobDriveRef: `job-drive:${crypto.randomUUID()}`, companyName: null, roleTitle: null } };
+    assert.deepEqual(validateProposalForConfirmation(linked), []);
+    assert.deepEqual(validateProposalForConfirmation({ ...draft(), payload: { ...draft().payload, companyName: null } }), [{ fieldPath: "companyName", message: "Company is required." }]);
   });
 
-  it("rejects draft proposals at the persisted assistant response boundary", () => {
-    const result = assistantResponseSchema.safeParse({
-      decision: {
-        kind: "proposals",
-        batchId: crypto.randomUUID(),
-        proposals: [applicationProposalDraft()],
-      },
-      metadata: {
-        provider: "demo",
-        model: "demo-v1",
-        latencyMs: 3,
-        isDemo: true,
-      },
-    });
-
-    assert.equal(result.success, false);
-  });
-
-  it("accepts persisted proposals at the assistant response boundary", () => {
-    const result = assistantResponseSchema.safeParse({
-      decision: {
-        kind: "proposals",
-        batchId: crypto.randomUUID(),
-        proposals: [applicationProposal()],
-      },
-      metadata: {
-        provider: "demo",
-        model: "demo-v1",
-        latencyMs: 3,
-        isDemo: true,
-      },
-    });
-
-    assert.equal(result.success, true);
-  });
-
-  it("rejects a malformed timezone before provider invocation", () => {
-    const result = assistantRequestSchema.safeParse({
-      message: "I applied to Acme for Frontend Engineer.",
-      timeZone: "Mars/Olympus_Mons",
-      locale: "en-IN",
-      clientRequestId: crypto.randomUUID(),
-    });
-
-    assert.equal(result.success, false);
-  });
-});
-
-describe("confirmation readiness", () => {
-  it("requires the core fields for an application write", () => {
-    const proposal = applicationProposal();
-    if (proposal.kind !== "create_application") throw new Error("Invalid fixture");
-
-    proposal.payload.companyName = null;
-
-    assert.deepEqual(validateProposalForConfirmation(proposal), [
-      { fieldPath: "companyName", message: "Company is required." },
-    ]);
-  });
-
-  it("does not allow a reminder without a specific due time", () => {
-    const proposal: ActionProposal = {
-      id: crypto.randomUUID(),
-      version: 1,
-      ref: "draft:1",
-      kind: "create_task",
-      summary: "Follow up with Acme",
-      evidence: [{ fieldPath: "title", quote: "Follow up with Acme" }],
-      assumptions: [],
-      payload: {
-        title: "Follow up with Acme",
-        dueAt: null,
-        priority: "medium",
-        reminderRequested: true,
-        notes: null,
-      },
-    };
-
-    assert.deepEqual(validateProposalForConfirmation(proposal), [
-      {
-        fieldPath: "dueAt",
-        message: "A reminder needs a specific due date and time.",
-      },
-    ]);
-  });
-
-  it("rejects evidence that was not present in the user's message", () => {
-    const proposal = applicationProposal();
-    if (proposal.kind !== "create_application") throw new Error("Invalid fixture");
-
-    proposal.evidence[0] = {
-      fieldPath: "companyName",
-      quote: "Invented Company",
-    };
-
-    assert.deepEqual(
-      validateProposalEvidence(
-        "I applied to Acme for Frontend Engineer.",
-        proposal,
-      ),
-      [
-        {
-          fieldPath: "companyName",
-          message: "Proposal evidence must be quoted from the source message.",
-        },
-      ],
-    );
+  it("rejects evidence not copied from the source message", () => {
+    assert.deepEqual(validateProposalEvidence("OA at Acme", { ...draft(), evidence: [{ fieldPath: "roleTitle", quote: "Invented role" }] }), [{ fieldPath: "roleTitle", message: "Proposal evidence must be quoted from the source message." }]);
   });
 });

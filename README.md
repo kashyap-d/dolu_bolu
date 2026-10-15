@@ -1,75 +1,61 @@
 # dolu bolu
 
-dolu bolu is a personal career-operations assistant for job seekers. The current release focuses on application tracking: a user can add and update applications manually, or write a message such as “I applied to Acme yesterday” and review the structured action proposed by the assistant before anything is saved.
+dolu bolu is a personal career-operations assistant for early-career job seekers. It tracks each company-and-role hiring process as one **Job Drive** — planned → applied → assessment → interview → offer → accepted, or rejected/withdrawn at any point. You can update a drive with a form, or describe what happened in plain language and review the structured change before anything is saved.
 
-The longer-term product is a trusted workspace for applications, interviews, and follow-ups. It is deliberately not a job marketplace, an autonomous application bot, or a generic chatbot with unrelated AI features.
+It is deliberately not a job marketplace, an autonomous application bot, or a chatbot with unrelated AI features.
 
-## Why this architecture
+## How it works
 
-The model is an interpreter, not an administrator:
-
-```text
-message
-  -> provider-independent AI adapter
-  -> Zod + domain validation
-  -> reviewable proposal
-  -> explicit user approval
-  -> deterministic, idempotent write
-```
-
-This keeps provider choice loosely coupled and makes the trust boundary testable. Development works with a deterministic demo provider; Gemini is the intended first free hosted provider. Other vendors can be evaluated behind the same contract without changing the product workflow.
-
-## Current project state
-
-The application vertical slice is working end to end:
+The model interprets; it never writes.
 
 ```text
-Google sign-in
-  -> protected workspace
-  -> manual form or natural-language message
-  -> editable application/proposal
-  -> authenticated database mutation
-  -> reload-safe application list
+message + a bounded slice of your drives
+  -> ActionProposalProvider (Gemini, or a deterministic stand-in)
+  -> shared Zod schema            (provider output is untrusted)
+  -> resolveProposal              (match the drive, merge details, block silent regressions)
+  -> pending proposal             (persisted, idempotent per request)
+  -> editable review card
+  -> your explicit confirmation
+  -> one atomic SQL function      (drive + OA/interview details + immutable activity)
 ```
 
-### Implemented
+Manual edits take the same final step. Every architectural choice and its trade-offs is recorded in [`docs/decisions`](docs/decisions/README.md); the detailed request trace is in [`WORKFLOW.md`](WORKFLOW.md).
 
-- Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS.
-- Google OAuth through cookie-bound Supabase SSR clients.
-- Protected `/app` and `/app/applications` routes with server-side data loading.
-- A responsive command center with manual application entry and editable AI proposals.
-- Shared schemas for applications, interviews, tasks, and proposal decisions.
-- A provider interface, a no-key deterministic development adapter, and a server-only Gemini structured-output adapter.
-- Durable pending proposals, atomic/idempotent application confirmation, and rejection through narrow Postgres functions.
-- Deterministic manual application entry with retry-safe client IDs, plus editable lifecycle statuses guarded by optimistic concurrency.
-- Owner-scoped Row Level Security and a server-authored activity event when an AI proposal is confirmed.
-- A reload-safe application list plus local demo mode when Supabase is not configured.
-- Unit and contract tests for proposal validation, provider behavior, application payloads, and environment handling.
-- Repository-wide product and engineering guidance in `AGENTS.md` and a detailed trace of the AI proposal workflow in `WORKFLOW.md`.
+## What works today
 
-### Engineering decisions worth discussing
+- Google sign-in (Supabase, cookie-bound PKCE) and a protected workspace at `/app`.
+- A command center whose main input accepts your own words or a pasted OA invite, recruiter email, or interview invitation. Email addresses and phone numbers are removed before anything is sent or saved.
+- An agenda of what needs you next: loose ends (a round that has passed but is still marked scheduled, missed OA or apply-by dates), the next two weeks by day, and drives that have gone quiet.
+- A drive list and a drive page with an interactive stage bar, OA details, interview rounds as a list, and an activity history.
+- "Your data": export everything as JSON, or permanently delete your account.
+- Retry-safe creates, optimistic concurrency on edits, duplicate warnings that recognise "Globex Pvt. Ltd." and "globex" as the same company, and explicitly audited corrections for backward moves.
+- Day-precision facts (applied on, apply by) stored as calendar dates in your own time zone.
+- Row Level Security on every user table; the browser cannot write tables directly.
+- A per-user daily cap on hosted AI requests.
+- A no-sign-in local preview at `/` when Supabase is not configured. It always uses the deterministic provider and stores nothing.
 
-| Decision | Why it matters |
-| --- | --- |
-| The model proposes; deterministic code writes | Prevents unreviewed AI output from mutating user data. |
-| Provider-independent contract | Gemini, a local model, or another hosted model can be compared without rewriting the workflow. |
-| Schema and semantic validation | Treats model output as untrusted input and catches structurally valid but unsafe actions. |
-| Database RPC for proposal confirmation | Makes application creation, proposal completion, and activity recording atomic and retry-safe. |
-| Row Level Security | Enforces ownership in the database instead of relying only on UI or route checks. |
-| Optimistic concurrency for edits | Detects stale updates rather than silently overwriting a newer application state. |
+## Project structure
 
-### Current limitations
-
-- Interviews and follow-up tasks have domain schemas, but do not yet have complete persistence and user workflows.
-- Manual application creation and lifecycle edits do not yet write activity events; only confirmed AI-created applications have an audit event.
-- The activity log is not yet visible in the interface.
-- Tests cover contracts and core logic, but there is no automated browser test suite or CI pipeline yet.
-- Provider latency and request IDs are returned, but there is no production observability dashboard or prompt/model regression history.
-- Application lists are intentionally simple and currently lack search, filtering, pagination, and duplicate warnings.
+```text
+src/app                 routes, layouts, thin route handlers
+src/components/ui       design-system primitives (Button, Card, Field, Notice, …)
+src/features/assistant  proposal contracts, resolution logic, command center
+src/features/job-drives domain contracts, stage rules, matching, drive views
+src/features/workspace  app shell, navigation, gateway (HTTP or in-memory), API client
+src/server/ai           provider boundary and adapters
+src/server/repositories owner-scoped persistence
+src/server/services     authorization-aware workflows
+src/server/http.ts      shared route-handler plumbing (auth, validation, errors)
+supabase/migrations     the database source of truth
+tests                   unit tests; tests/db holds database tests
+e2e                     Playwright tests against the local preview
+evals                   sanitized AI evaluation cases
+scripts                 eval runner, database type generator, test-database helper
+```
 
 ## Run locally
 
-Requirements: Node.js 22.13+ and npm.
+Requires Node.js 22.13+ and npm.
 
 ```bash
 cp .env.example .env.local
@@ -77,80 +63,47 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). With `AI_PROVIDER=demo`, no API key or Supabase project is required to explore the current interface.
+With the template values, [http://localhost:3000](http://localhost:3000) opens the in-memory preview — no keys needed.
 
-When valid Supabase values are present, `/` redirects to the authenticated workspace. Without them, `/` runs a clearly labeled, in-memory preview.
+### Connect Supabase
 
-## Supabase setup
+1. Create a Supabase project. Set `NEXT_PUBLIC_SUPABASE_URL` (the base URL, without `/rest/v1`) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+2. Apply every file in `supabase/migrations` in filename order. Connecting a GitHub repository does not run them for you.
+3. Enable the Google provider in Supabase Authentication, and add `https://<project-ref>.supabase.co/auth/v1/callback` to the Google OAuth client.
+4. In Supabase URL Configuration, set the Site URL to `http://localhost:3000` and allow `http://localhost:3000/auth/callback`.
+5. Restart `npm run dev`. `/` now redirects to `/app`.
 
-1. Create a Supabase project and copy `.env.example` to `.env.local`.
-2. Set `NEXT_PUBLIC_SUPABASE_URL` to the project base URL (for example, `https://<project-ref>.supabase.co`) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the public publishable key. Do not include `/rest/v1` in the URL.
-3. Apply both SQL files in `supabase/migrations` in filename order. They are the database source of truth; connecting a GitHub repository does not by itself guarantee that they have run against an existing project.
-4. In Supabase Authentication, enable Google and add the Google OAuth client ID and secret.
-5. In the Google Cloud OAuth web client, add Supabase's callback URL:
+### Use Gemini
 
-   ```text
-   https://<project-ref>.supabase.co/auth/v1/callback
-   ```
+1. Add a server-only `GEMINI_API_KEY` (never `NEXT_PUBLIC_`) and set `AI_PROVIDER=gemini`.
+2. Run `npm run eval:ai` before using real messages.
+3. Optionally tune `AI_MODEL`, `AI_TIMEOUT_MS`, `AI_MAX_OUTPUT_TOKENS`, and `AI_DAILY_REQUEST_LIMIT`.
 
-6. In Supabase Authentication URL Configuration, set the local Site URL to `http://localhost:3000` and add this redirect URL:
+The provider receives only the message (with email addresses and phone numbers removed), the current time/time zone/locale, and a few summaries of your own drives: those at companies the message names, or up to 10 recent active ones if it names none. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
 
-   ```text
-   http://localhost:3000/auth/callback
-   ```
-
-Restart `npm run dev` after environment changes. A Gemini key is not needed while `AI_PROVIDER=demo`.
-
-Do not put real credentials in `.env.example` or commit `.env.local`.
-
-## Gemini setup and evaluation
-
-Gemini is an explicit alternative to the deterministic demo provider; there is no silent vendor fallback.
-
-1. Add `GEMINI_API_KEY` to `.env.local`. Keep it server-only—never use a `NEXT_PUBLIC_` prefix.
-2. Set `AI_PROVIDER=gemini`. Leave `AI_MODEL` empty to use `gemini-3.5-flash-lite`, or set a reviewed model ID explicitly.
-3. Run the sanitized provider evaluation before exercising real job-search messages:
-
-   ```bash
-   npm run eval:ai
-   ```
-
-4. Restart the development server and test proposal, edit, confirmation, and reload end to end.
-
-The adapter sends only the current message, current time/timezone/locale, and at most 20 recent application labels/statuses. Provider output remains untrusted: Zod and deterministic semantic checks run before a pending proposal can be stored. Verify the selected model's current availability and terms on [Google's Gemini pricing page](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so do not test with sensitive personal data.
-
-## Quality checks
+## Quality gates
 
 ```bash
 npm run lint
-npm run typecheck
-npm test
-npm run eval:ai
+npm run typecheck   # generates Next route types, then runs tsc
+npm test            # unit tests
+npm run test:db     # database tests; needs PostgreSQL 15+ installed locally, or TEST_DATABASE_URL
+npm run test:e2e    # Playwright; run `npx playwright install chromium` once
+npm run eval:ai     # uses the configured provider
 npm run build
 ```
 
-## Environment
+After changing a migration, run `npm run db:types` to regenerate `src/server/supabase/database.types.ts`. CI runs everything above with the deterministic provider and fails if the generated types are stale.
 
-See `.env.example`. Only `NEXT_PUBLIC_` values may enter the browser bundle. AI keys and future service credentials stay server-side.
+## Roadmap
 
-## Recommended roadmap
+| Phase | Outcome |
+| --- | --- |
+| 0. Cleanup — done | Legacy application slice removed, AI quota, CI, decision records. |
+| 1. Structure — done | App shell layout, gateway/navigation abstractions, typed API client, shared route helper, design tokens and primitives, single-proposal contract, tested proposal resolution. |
+| 2. Correctness — done | Date-only fields, normalised drive matching, relevance-based model context, value rules as table constraints, generated database types, Gemini schema derived from Zod, database and end-to-end tests in CI. |
+| 3. Product — done | Agenda home screen with loose ends and quiet drives, paste-anything extraction with contact-detail redaction, interview rounds as a list, data export and account deletion. |
+| Next | Deploy to Vercel with a seeded demo account; signed-in end-to-end tests; reminders for loose ends (with explicit consent). |
+| Later | Separately authorized Calendar sync, an evidence-grounded application brief. |
 
-The order below deepens the real use case while making each milestone demonstrate a different engineering skill.
-
-| Phase | Product outcome | Engineering signal |
-| --- | --- | --- |
-| 1. Trustworthy history | Record manual creates and edits atomically, show field-level activity, and warn about likely duplicates. | Transactions, audit design, concurrency, database constraints. |
-| 2. Interview workflow | Capture an interview from text, clarify missing date/timezone data, persist it, and allow edits. | Multi-step agent workflow, temporal validation, reusable domain architecture. |
-| 3. Calendar integration | Create a Google Calendar event only after approval and reconcile retries or later edits. | Scoped OAuth, third-party API integration, idempotency, failure recovery. |
-| 4. Follow-up engine | Suggest and schedule follow-ups from application state while keeping the user in control. | Background jobs, scheduling, retries, notifications, policy-based automation. |
-| 5. Production hardening | Add GitHub Actions, browser-level tests, structured logs, metrics, and a deployed demo. | CI/CD, E2E testing, observability, operational ownership. |
-
-## Selective additions that could make the project stand out
-
-These are useful extensions after the core roadmap, not a feature checklist:
-
-- **Evidence-grounded application brief:** extract requirements from a pasted job description and map them to facts the user has supplied about their experience. Show evidence and gaps rather than inventing a compatibility score. This can demonstrate retrieval, provenance, and AI evaluation without becoming another generic resume scorer.
-- **Next-action planner:** examine the user’s actual application state and propose a small set of reviewable next actions, such as preparing for an interview or following up after a chosen interval. Every action should use the same proposal-and-approval boundary as application capture.
-- **Provider evaluation report:** expand the sanitized fixture suite, compare model versions behind the common interface, and track correctness, latency, and cost. This makes the loosely coupled AI design measurable instead of merely architectural.
-
-A marketplace, autonomous mass application, email-wide access, and the hiring-manager assistant (“bolu”) are intentionally deferred. The strongest portfolio version is a smaller system with trustworthy workflows, failure handling, tests, and measurable AI quality—not a broad collection of disconnected features.
+A marketplace, autonomous applications, inbox-wide email access, and a recruiter-facing product are out of scope.

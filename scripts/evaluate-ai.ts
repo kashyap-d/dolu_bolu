@@ -4,7 +4,13 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { validateProposalEvidence } from "@/features/assistant/validate-proposal";
+import { MAX_MESSAGE_LENGTH } from "@/features/assistant/contracts";
+import { validateProposalEvidence, validateProposalForConfirmation } from "@/features/assistant/validate-proposal";
+import {
+  AiProviderError,
+  type ActionProposalInput,
+  type ActionProposalProvider,
+} from "@/server/ai/action-proposal-provider";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
 
 const processWithEnvLoader = process as NodeJS.Process & {
@@ -24,17 +30,41 @@ const fixtureSchema = z.array(
   z
     .object({
       id: z.string().min(1),
-      message: z.string().min(1).max(2_000),
+      message: z.string().min(1).max(MAX_MESSAGE_LENGTH),
+      /** Free-form cases the deterministic template provider cannot be expected to handle. */
+      languageModelOnly: z.boolean().optional(),
+      context: z
+        .array(
+          z.object({
+            ref: z.string(),
+            companyName: z.string(),
+            roleTitle: z.string(),
+            stage: z.string(),
+            location: z.string().nullable(),
+            sourceUrl: z.string().nullable(),
+            updatedAt: z.string(),
+          }).strict(),
+        )
+        .optional(),
       expected: z
         .object({
           decisionKind: z.enum([
-            "proposals",
+            "proposal",
             "needs_clarification",
             "unsupported",
           ]),
           companyName: z.string().optional(),
           roleTitle: z.string().optional(),
-          status: z.enum(["saved", "applied"]).optional(),
+          stage: z.enum(["planned", "applied", "assessment", "interview", "offer", "accepted", "rejected", "withdrawn"]).optional(),
+          jobDriveRef: z.string().optional(),
+          isCorrection: z.boolean().optional(),
+          appliedAtMustBeNull: z.boolean().optional(),
+          appliedAt: z.iso.date().optional(),
+          applyBy: z.iso.date().optional(),
+          hasAssessment: z.boolean().optional(),
+          hasInterview: z.boolean().optional(),
+          roundKind: z.string().optional(),
+          roundStatus: z.string().optional(),
         })
         .strict(),
     })
@@ -43,36 +73,57 @@ const fixtureSchema = z.array(
 
 async function main() {
   const fixtureUrl = new URL(
-    "../evals/application-capture.json",
+    "../evals/job-drive-progress.json",
     import.meta.url,
   );
-  const fixtures = fixtureSchema.parse(
+  const allFixtures = fixtureSchema.parse(
     JSON.parse(await readFile(fixtureUrl, "utf8")),
   );
-  const provider = getActionProposalProvider();
+  const selectedCase = process.argv[2];
+  const fixtures = selectedCase
+    ? allFixtures.filter((fixture) => fixture.id === selectedCase)
+    : allFixtures;
+  if (fixtures.length === 0) throw new Error(`Unknown evaluation case: ${selectedCase}`);
+  const provider = getActionProposalProvider({ allowHosted: true });
   let passed = 0;
+  let skipped = 0;
 
   for (const fixture of fixtures) {
-    const result = await provider.propose({
+    if (fixture.languageModelOnly && provider.isDemo) {
+      skipped += 1;
+      process.stdout.write(`SKIP ${fixture.id} (needs a language model)\n`);
+      continue;
+    }
+    const result = await proposeWithRetry(provider, {
       message: fixture.message,
       now: "2026-09-15T12:00:00.000Z",
       timeZone: "Asia/Kolkata",
       locale: "en-IN",
-      context: { applications: [] },
+      context: { jobDrives: fixture.context ?? [] },
     });
     const failures: string[] = [];
 
-    if (result.decision.kind !== fixture.expected.decisionKind) {
+    // What the user sees: the service turns a proposal that is missing required
+    // identity into a clarification question before anything is shown.
+    const caughtByApp =
+      result.decision.kind === "proposal" &&
+      validateProposalForConfirmation(result.decision.proposal).length > 0;
+    const effectiveKind = caughtByApp ? "needs_clarification" : result.decision.kind;
+
+    if (effectiveKind !== fixture.expected.decisionKind) {
       failures.push(
         `expected ${fixture.expected.decisionKind}, received ${result.decision.kind}`,
       );
     }
+    if (caughtByApp && fixture.expected.decisionKind === "needs_clarification") {
+      process.stdout.write(`  note: ${fixture.id} returned an incomplete proposal; app validation asked instead\n`);
+    }
 
-    if (result.decision.kind === "proposals") {
-      const proposal = result.decision.proposals[0];
+    if (result.decision.kind === "proposal" && !caughtByApp) {
+      const proposal = result.decision.proposal;
 
-      if (proposal?.kind !== "create_application") {
-        failures.push("expected one create_application proposal");
+      if (proposal?.kind !== "record_job_drive_progress") {
+        failures.push("expected one record_job_drive_progress proposal");
       } else {
         if (
           fixture.expected.companyName &&
@@ -89,11 +140,21 @@ async function main() {
         }
 
         if (
-          fixture.expected.status &&
-          proposal.payload.status !== fixture.expected.status
+          fixture.expected.stage &&
+          proposal.payload.stage !== fixture.expected.stage
         ) {
-          failures.push("status mismatch");
+          failures.push("stage mismatch");
         }
+
+        if (fixture.expected.jobDriveRef && proposal.payload.jobDriveRef !== fixture.expected.jobDriveRef) failures.push("jobDriveRef mismatch");
+        if (fixture.expected.isCorrection !== undefined && proposal.payload.isCorrection !== fixture.expected.isCorrection) failures.push("isCorrection mismatch");
+        if (fixture.expected.appliedAtMustBeNull && proposal.payload.appliedAt !== null) failures.push("appliedAt was invented");
+        if (fixture.expected.appliedAt && proposal.payload.appliedAt !== fixture.expected.appliedAt) failures.push(`appliedAt ${proposal.payload.appliedAt} ≠ ${fixture.expected.appliedAt}`);
+        if (fixture.expected.applyBy && proposal.payload.applyBy !== fixture.expected.applyBy) failures.push(`applyBy ${proposal.payload.applyBy} ≠ ${fixture.expected.applyBy}`);
+        if (fixture.expected.hasAssessment !== undefined && Boolean(proposal.payload.assessment) !== fixture.expected.hasAssessment) failures.push("assessment detail mismatch");
+        if (fixture.expected.roundKind && proposal.payload.interviewRound?.kind !== fixture.expected.roundKind) failures.push(`round kind ${proposal.payload.interviewRound?.kind} ≠ ${fixture.expected.roundKind}`);
+        if (fixture.expected.roundStatus && proposal.payload.interviewRound?.status !== fixture.expected.roundStatus) failures.push(`round status ${proposal.payload.interviewRound?.status} ≠ ${fixture.expected.roundStatus}`);
+        if (fixture.expected.hasInterview !== undefined && Boolean(proposal.payload.interviewRound) !== fixture.expected.hasInterview) failures.push("interview detail mismatch");
 
         if (validateProposalEvidence(fixture.message, proposal).length > 0) {
           failures.push("evidence was not copied exactly from the source message");
@@ -110,11 +171,31 @@ async function main() {
   }
 
   process.stdout.write(
-    `\n${provider.name}/${provider.model}: ${passed}/${fixtures.length} cases passed\n`,
+    `\n${provider.name}/${provider.model}: ${passed}/${fixtures.length - skipped} cases passed` +
+      (skipped ? ` (${skipped} skipped: need a language model)\n` : "\n"),
   );
 
-  if (passed !== fixtures.length) {
+  if (passed !== fixtures.length - skipped) {
     process.exitCode = 1;
+  }
+}
+
+const retryDelaysMs = [5_000, 15_000, 45_000];
+
+/** Retries transient provider failures (free tiers rate-limit quickly) with backoff. */
+async function proposeWithRetry(
+  provider: ActionProposalProvider,
+  input: ActionProposalInput,
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await provider.propose(input);
+    } catch (error) {
+      const delay = retryDelaysMs[attempt];
+      if (!(error instanceof AiProviderError && error.retryable) || delay === undefined) throw error;
+      process.stdout.write(`  … ${error.code.toLowerCase()}, retrying in ${delay / 1000}s\n`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 }
 

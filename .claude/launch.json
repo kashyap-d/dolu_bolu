@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "preview-no-supabase",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NEXT_PUBLIC_SUPABASE_URL=", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=", "AI_PROVIDER=demo", "NEXT_DIST_DIR=.next-e2e", "npx", "next", "dev", "-p", "3100"],
+      "port": 3100
+    }
+  ]
+}

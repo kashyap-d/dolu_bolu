@@ -1,65 +1,34 @@
-import { z } from "zod";
+import { rejectProposalRequestSchema } from "@/features/assistant/contracts";
+import { authenticatedJsonRoute, jsonError, parseId, unauthenticated } from "@/server/http";
+import { rejectProposal } from "@/server/repositories/proposal-repository";
 
-import { getRequestAuth } from "@/server/auth/session";
-import {
-  ProposalRepositoryError,
-  rejectApplicationProposal,
-} from "@/server/repositories/proposal-repository";
+export const POST = authenticatedJsonRoute(
+  {
+    schema: rejectProposalRequestSchema,
+    invalidMessage: "Invalid proposal version.",
+    unavailableMessage: "The proposal could not be discarded.",
+  },
+  async ({ auth, body }, context: { params: Promise<{ proposalId: string }> }) => {
+    const proposalId = parseId((await context.params).proposalId);
+    if (!proposalId) return jsonError(404, "Proposal not found.");
 
-const rejectionRequestSchema = z.object({
-  version: z.number().int().positive(),
-}).strict();
-
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ proposalId: string }> },
-) {
-  const auth = await getRequestAuth();
-  if (!auth) {
-    return Response.json({ error: "Authentication required." }, { status: 401 });
-  }
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
-  }
-
-  const parsed = rejectionRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return Response.json({ error: "Invalid proposal version." }, { status: 400 });
-  }
-
-  const { proposalId } = await context.params;
-
-  try {
-    const result = await rejectApplicationProposal(auth.supabase, {
+    const result = await rejectProposal(auth.supabase, {
       proposalId,
-      version: parsed.data.version,
+      version: body.version,
     });
 
     switch (result.outcome) {
       case "rejected":
       case "already_rejected":
-        return Response.json(result);
+        return Response.json({ outcome: result.outcome });
       case "auth_required":
-        return Response.json({ error: "Authentication required." }, { status: 401 });
+        return unauthenticated();
       case "not_found":
-        return Response.json({ error: "Proposal not found." }, { status: 404 });
+        return jsonError(404, "Proposal not found.");
       case "conflict":
-        return Response.json(
-          { error: "This proposal has changed or is no longer pending." },
-          { status: 409 },
-        );
+        return jsonError(409, "This proposal has changed or is no longer pending.", {
+          recovery: "Refresh to load the latest proposal.",
+        });
     }
-  } catch (error) {
-    if (error instanceof ProposalRepositoryError) {
-      return Response.json(
-        { error: "The proposal could not be discarded. Please try again." },
-        { status: 503 },
-      );
-    }
-    throw error;
-  }
-}
+  },
+);
