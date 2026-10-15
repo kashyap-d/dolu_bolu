@@ -1,17 +1,16 @@
 "use client";
 
-import { ArrowUp, CalendarClock, LockKeyhole, MessageCircleMore, Plus, Sparkles } from "lucide-react";
+import { ArrowUp, LockKeyhole, MessageCircleMore, Plus, Sparkles } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, Eyebrow, PageHeader } from "@/components/ui/card";
-import { LocalWhen } from "@/components/ui/local-date-time";
+import { Card, PageHeader } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import type { ActionProposal, AssistantResponse } from "@/features/assistant/contracts";
+import { AgendaPanel } from "@/features/job-drives/components/agenda-panel";
 import { JobDriveEditor } from "@/features/job-drives/components/job-drive-editor";
 import type { JobDrive } from "@/features/job-drives/contracts";
 import { emptyJobDrivePayload, payloadFromProposal } from "@/features/job-drives/payload";
-import { importantDateForDrive } from "@/features/job-drives/stage-rules";
 import { useGateway } from "@/features/workspace/gateway";
 import { WorkspaceLink } from "@/features/workspace/navigation";
 
@@ -22,16 +21,6 @@ const suggestions = [
   { label: "Record an OA", message: "OA at Linear for Frontend Engineer tomorrow." },
   { label: "Try something vague", message: "I reached the next round." },
 ];
-
-function upcomingDates(drives: JobDrive[], now: number, limit = 4) {
-  return drives
-    .flatMap((drive) => {
-      const important = importantDateForDrive(drive, now);
-      return important && important.at >= now ? [{ drive, important }] : [];
-    })
-    .sort((left, right) => left.important.at - right.important.at)
-    .slice(0, limit);
-}
 
 export function CommandCenterView({
   greetingName,
@@ -53,13 +42,11 @@ export function CommandCenterView({
   // reconcile with the stored list when the route re-renders.
   const [newProposals, setNewProposals] = useState<ActionProposal[]>([]);
   const [resolvedIds, setResolvedIds] = useState<ReadonlySet<string>>(new Set());
-  const [now] = useState(() => Date.now());
 
   const proposals = [
     ...newProposals.filter((proposal) => !storedProposals.some((stored) => stored.id === proposal.id)),
     ...storedProposals,
   ].filter((proposal) => !resolvedIds.has(proposal.id));
-  const upcoming = upcomingDates(drives, now);
 
   function clearNotices() {
     setError(null);
@@ -106,7 +93,7 @@ export function CommandCenterView({
         title="Keep every hiring process moving."
       />
 
-      <div className="mt-9 grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-9 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section aria-label="Assistant" className="min-w-0">
           <Card className="overflow-hidden" raised>
             <div className="flex items-start gap-4 border-b border-line px-5 py-5 sm:px-7">
@@ -256,56 +243,12 @@ export function CommandCenterView({
         </section>
 
         <aside className="space-y-5">
-          <Card className="p-5">
-            <Eyebrow>Coming up</Eyebrow>
-            {upcoming.length ? (
-              <ul className="mt-4 space-y-3">
-                {upcoming.map(({ drive, important }) => (
-                  <li key={drive.id}>
-                    <WorkspaceLink
-                      className="flex w-full items-start gap-3 rounded-xl p-2 text-left transition hover:bg-surface-muted"
-                      to={{ view: "drive", driveId: drive.id }}
-                    >
-                      <CalendarClock aria-hidden="true" className="mt-0.5 shrink-0 text-brand-text" size={15} />
-                      <span className="min-w-0 text-xs leading-5">
-                        <span className="block truncate font-semibold text-ink-soft">
-                          {important.label} · {drive.companyName}
-                        </span>
-                        <span className="text-muted">
-                          <LocalWhen allDay={important.allDay} value={important.value} />
-                        </span>
-                      </span>
-                    </WorkspaceLink>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-xs leading-5 text-muted">
-                Nothing dated yet. OA deadlines, interviews, and apply-by dates will show here.
-              </p>
-            )}
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4">
-              <div className="rounded-xl bg-surface-muted px-3 py-3 text-center">
-                <p className="text-xl font-semibold text-ink-soft">{drives.length}</p>
-                <p className="text-[10px] uppercase text-subtle">Drives</p>
-              </div>
-              <div className="rounded-xl bg-accent-soft px-3 py-3 text-center">
-                <p className="text-xl font-semibold text-accent-ink">{proposals.length}</p>
-                <p className="text-[10px] uppercase text-accent-ink/80">To review</p>
-              </div>
-            </div>
-          </Card>
-          <section className="rounded-3xl bg-brand p-5 text-white">
-            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white/70">
-              <LockKeyhole aria-hidden="true" size={14} /> How this stays safe
-            </p>
-            <p className="mt-3 text-[15px] font-semibold leading-6">
-              The model proposes. Deterministic code checks it. Only your confirmation writes.
-            </p>
-            <p className="mt-2 text-xs leading-5 text-white/70">
-              Every saved change is atomic, safe to retry, and recorded in the drive&apos;s history.
-            </p>
-          </section>
+          <AgendaPanel drives={drives} />
+          <p className="flex items-start gap-2 px-2 text-xs leading-5 text-subtle">
+            <LockKeyhole aria-hidden="true" className="mt-0.5 shrink-0" size={13} />
+            The model proposes, deterministic code checks it, and only your confirmation writes. Every saved
+            change is recorded in the drive&apos;s history.
+          </p>
         </aside>
       </div>
     </>

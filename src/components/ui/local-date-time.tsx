@@ -1,8 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
-const subscribe = () => () => {};
+import { useIsClient } from "@/lib/use-is-client";
 
 const formatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -21,7 +19,7 @@ export function LocalDateTime({
   value: string | null;
   fallback?: string;
 }) {
-  const isClient = useSyncExternalStore(subscribe, () => true, () => false);
+  const isClient = useIsClient();
   if (!value) return <>{fallback}</>;
   return (
     <time dateTime={value} suppressHydrationWarning>

@@ -9,6 +9,7 @@ const port = 3200;
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/warm-up.ts",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -23,10 +24,11 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"], locale: "en-US", timezoneId: "America/Los_Angeles" } },
   ],
   webServer: {
-    command: `next dev --port ${port}`,
+    // A production build: what ships, and no on-demand compilation racing the tests.
+    command: `next build && next start --port ${port}`,
     url: `http://localhost:${port}`,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
     env: {
       // Empty values (as in .env.example) select the in-memory preview and
       // take precedence over anything in .env.local.

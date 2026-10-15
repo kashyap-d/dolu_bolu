@@ -21,6 +21,11 @@ test("records an application, then merges an OA into the same drive", async ({ p
   await page.getByRole("button", { name: "Confirm update" }).click();
   await expect(page.getByText("Linear saved from your confirmed proposal.")).toBeVisible();
 
+  // The agenda groups it under tomorrow, in the viewer's own time zone.
+  const agenda = page.locator("section", { hasText: "What needs you" });
+  await expect(agenda.getByText("Tomorrow")).toBeVisible();
+  await expect(agenda.getByRole("button", { name: /OA opens · Linear/ })).toBeVisible();
+
   await page.getByRole("button", { name: "View Drives" }).click();
   await expect(page.getByRole("heading", { name: "Job Drives" })).toBeVisible();
   await expect(page.getByText("1 hiring process")).toBeVisible();
