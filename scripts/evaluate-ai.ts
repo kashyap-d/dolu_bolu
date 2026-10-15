@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
+import { MAX_MESSAGE_LENGTH } from "@/features/assistant/contracts";
 import { validateProposalEvidence } from "@/features/assistant/validate-proposal";
 import {
   AiProviderError,
@@ -29,7 +30,7 @@ const fixtureSchema = z.array(
   z
     .object({
       id: z.string().min(1),
-      message: z.string().min(1).max(2_000),
+      message: z.string().min(1).max(MAX_MESSAGE_LENGTH),
       /** Free-form cases the deterministic template provider cannot be expected to handle. */
       languageModelOnly: z.boolean().optional(),
       context: z

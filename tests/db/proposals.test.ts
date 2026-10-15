@@ -148,3 +148,22 @@ describe("AI request allowance", { skip: skipWithoutDatabase }, () => {
     assert.equal((row!.result as { outcome: string }).outcome, "auth_required");
   });
 });
+
+describe("long source messages", { skip: skipWithoutDatabase }, () => {
+  let db: TestDatabase;
+  before(async () => {
+    db = await createTestDatabase();
+  });
+  after(async () => {
+    await db?.drop();
+  });
+
+  it("accepts a pasted email up to 8,000 characters and rejects longer ones", async () => {
+    const userId = await db.createUser();
+    const email = "I applied to Acme. ".padEnd(8000, "Thank you for your interest in this role. ");
+    assert.equal(email.length, 8000);
+    const accepted = await db.as(userId, (tx) => persist(tx, crypto.randomUUID(), email));
+    assert.ok(accepted.proposal_id);
+    await assert.rejects(db.as(userId, (tx) => persist(tx, crypto.randomUUID(), `${email}x`)), /INVALID_PROPOSAL/);
+  });
+});

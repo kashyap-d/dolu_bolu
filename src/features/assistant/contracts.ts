@@ -2,6 +2,9 @@ import { z } from "zod";
 
 import { interviewRoundFields, jobDriveProgressPayloadSchema } from "@/features/job-drives/contracts";
 
+/** Long enough for a pasted email or invite (docs/decisions/0020). */
+export const MAX_MESSAGE_LENGTH = 8_000;
+
 export const evidenceSchema = z
   .object({
     fieldPath: z.string().min(1).max(80),
@@ -147,7 +150,7 @@ const timeZoneSchema = z
 
 export const assistantRequestSchema = z
   .object({
-    message: z.string().trim().min(1).max(2_000),
+    message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
     timeZone: timeZoneSchema,
     locale: z.string().min(2).max(35).default("en-IN"),
     clientRequestId: z.uuid(),

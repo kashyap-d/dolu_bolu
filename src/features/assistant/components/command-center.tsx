@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, PageHeader } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
-import type { ActionProposal, AssistantResponse } from "@/features/assistant/contracts";
+import { MAX_MESSAGE_LENGTH, type ActionProposal, type AssistantResponse } from "@/features/assistant/contracts";
 import { AgendaPanel } from "@/features/job-drives/components/agenda-panel";
 import { JobDriveEditor } from "@/features/job-drives/components/job-drive-editor";
 import type { JobDrive } from "@/features/job-drives/contracts";
@@ -103,7 +103,9 @@ export function CommandCenterView({
               </span>
               <div>
                 <h2 className="font-display text-base font-semibold text-ink">What changed?</h2>
-                <p className="mt-1 text-sm text-muted">Describe one Job Drive update in your own words.</p>
+                <p className="mt-1 text-sm text-muted">
+                  Describe an update in your own words, or paste an OA invite, recruiter email, or interview invitation.
+                </p>
               </div>
             </div>
             <form
@@ -117,9 +119,9 @@ export function CommandCenterView({
                 Describe a Job Drive update
               </label>
               <textarea
-                className="min-h-28 w-full resize-none bg-transparent text-base leading-7 text-ink outline-none placeholder:text-subtle"
+                className="field-sizing-content max-h-96 min-h-28 w-full resize-none bg-transparent text-base leading-7 text-ink outline-none placeholder:text-subtle"
                 id="assistant-message"
-                maxLength={2000}
+                maxLength={MAX_MESSAGE_LENGTH}
                 onChange={(event) => setMessage(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -131,9 +133,17 @@ export function CommandCenterView({
                 value={message}
               />
               <div className="mt-3 flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="flex items-center gap-1.5 text-[11px] text-subtle">
-                  <Sparkles aria-hidden="true" size={12} /> dolu bolu proposes. You decide.
-                </p>
+                <div className="space-y-0.5 text-[11px] text-subtle">
+                  <p className="flex items-center gap-1.5">
+                    <Sparkles aria-hidden="true" size={12} /> dolu bolu proposes. You decide.
+                  </p>
+                  <p>
+                    Email addresses and phone numbers are removed before anything is sent or saved.
+                    {message.length > MAX_MESSAGE_LENGTH * 0.8
+                      ? ` ${(MAX_MESSAGE_LENGTH - message.length).toLocaleString()} characters left.`
+                      : null}
+                  </p>
+                </div>
                 <Button className="h-11 px-5" disabled={!message.trim() || isInterpreting} type="submit">
                   {isInterpreting ? "Interpreting…" : "Prepare update"} <ArrowUp size={16} />
                 </Button>

@@ -7,6 +7,7 @@ import {
   type AssistantResponse,
 } from "@/features/assistant/contracts";
 import { selectModelContext } from "@/features/assistant/model-context";
+import { redactContactDetails } from "@/features/assistant/redact";
 import { resolveProposal } from "@/features/assistant/resolve-proposal";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
 import { getAiDailyRequestLimit } from "@/server/env";
@@ -78,9 +79,12 @@ async function replayedResponse(
  * against no stored drives and returns an unsaved proposal.
  */
 export async function prepareProposal(
-  request: AssistantRequest,
+  original: AssistantRequest,
   persistence: PersistenceContext | null,
 ): Promise<AssistantResponse> {
+  // Everything downstream (replay check, provider, evidence, storage) sees the
+  // same text, with contact details already removed.
+  const request = { ...original, message: redactContactDetails(original.message) };
   if (persistence) {
     const replay = await replayedResponse(persistence, request);
     if (replay) return assistantResponseSchema.parse(replay);
