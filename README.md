@@ -26,7 +26,8 @@ Manual edits take the same final step. Every architectural choice and its trade-
 - Google sign-in (Supabase, cookie-bound PKCE) and a protected workspace at `/app`.
 - A command center: natural-language updates, review/confirm/discard, manual entry, and an upcoming-dates panel.
 - A drive list and a drive page with an interactive stage bar, OA and interview details, and an activity history.
-- Retry-safe creates, optimistic concurrency on edits, duplicate warnings, and explicitly audited corrections for backward moves.
+- Retry-safe creates, optimistic concurrency on edits, duplicate warnings that recognise "Globex Pvt. Ltd." and "globex" as the same company, and explicitly audited corrections for backward moves.
+- Day-precision facts (applied on, apply by) stored as calendar dates in your own time zone.
 - Row Level Security on every user table; the browser cannot write tables directly.
 - A per-user daily cap on hosted AI requests.
 - A no-sign-in local preview at `/` when Supabase is not configured. It always uses the deterministic provider and stores nothing.
@@ -44,7 +45,10 @@ src/server/repositories owner-scoped persistence
 src/server/services     authorization-aware workflows
 src/server/http.ts      shared route-handler plumbing (auth, validation, errors)
 supabase/migrations     the database source of truth
-tests, evals            unit/contract tests and sanitized AI evaluations
+tests                   unit tests; tests/db holds database tests
+e2e                     Playwright tests against the local preview
+evals                   sanitized AI evaluation cases
+scripts                 eval runner, database type generator, test-database helper
 ```
 
 ## Run locally
@@ -73,19 +77,21 @@ With the template values, [http://localhost:3000](http://localhost:3000) opens t
 2. Run `npm run eval:ai` before using real messages.
 3. Optionally tune `AI_MODEL`, `AI_TIMEOUT_MS`, `AI_MAX_OUTPUT_TOKENS`, and `AI_DAILY_REQUEST_LIMIT`.
 
-The provider receives only the message, the current time/time zone/locale, and at most 20 summaries of your own drives. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
+The provider receives only the message, the current time/time zone/locale, and a few summaries of your own drives: those at companies the message names, or up to 10 recent active ones if it names none. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
 
 ## Quality gates
 
 ```bash
 npm run lint
 npm run typecheck   # generates Next route types, then runs tsc
-npm test
+npm test            # unit tests
+npm run test:db     # database tests; needs PostgreSQL 15+ installed locally, or TEST_DATABASE_URL
+npm run test:e2e    # Playwright; run `npx playwright install chromium` once
 npm run eval:ai     # uses the configured provider
 npm run build
 ```
 
-CI runs all five on every pull request with the deterministic provider.
+After changing a migration, run `npm run db:types` to regenerate `src/server/supabase/database.types.ts`. CI runs everything above with the deterministic provider and fails if the generated types are stale.
 
 ## Roadmap
 
@@ -93,7 +99,7 @@ CI runs all five on every pull request with the deterministic provider.
 | --- | --- |
 | 0. Cleanup — done | Legacy application slice removed, AI quota, CI, decision records. |
 | 1. Structure — done | App shell layout, gateway/navigation abstractions, typed API client, shared route helper, design tokens and primitives, single-proposal contract, tested proposal resolution. |
-| 2. Correctness | Date-only fields for day-precision facts, better drive matching, relevance-based model context, value checks as table constraints, generated database types, Gemini schema derived from Zod, database integration tests, one Playwright end-to-end test. |
+| 2. Correctness — done | Date-only fields, normalised drive matching, relevance-based model context, value rules as table constraints, generated database types, Gemini schema derived from Zod, database and end-to-end tests in CI. |
 | 3. Product | Agenda home screen with stale-drive detection, paste-anything extraction (OA invites, recruiter emails), interview rounds as a list, data export and account deletion. |
 | Later | Separately authorized Calendar sync, an evidence-grounded application brief. |
 

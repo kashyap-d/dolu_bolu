@@ -63,7 +63,7 @@ If an exact source URL or a similar active company/role/location exists, creatio
 1. The composer posts `{message, timeZone, locale, clientRequestId}` to `/api/assistant/proposals`.
 2. `prepareProposal` first checks `(user_id, client_request_id)` for an idempotent replay.
 3. Before calling a hosted model it reserves one unit of the user's daily allowance (`consume_ai_request`). The unauthenticated preview never reaches a hosted model.
-4. It sends the message, time context, and at most 20 of the user's own drive summaries to the selected `ActionProposalProvider`.
+4. It sends the message, time context, and the drive summaries chosen by `selectModelContext`: drives at companies the message names, or up to 10 recent active drives if it names none.
 5. The provider returns exactly one of `proposal`, `needs_clarification`, or `unsupported`. The only action kind is `record_job_drive_progress`.
 6. Zod validates the output. `resolveProposal` (pure, unit-tested) then checks that evidence is quoted from the message, that a correction was explicitly requested, and that a referenced drive exists and agrees on company/role. It resolves the target drive, attaches its real ID and `updatedAt`, merges omitted details, and keeps earlier news from moving a drive backwards.
 7. Any issue becomes a clarification question. Otherwise one proposal is persisted with a server-owned ID/version and shown as an editable review card.
@@ -111,6 +111,15 @@ The migration also:
 
 Every successful manual or confirmed-AI mutation appends an activity event with `source`, `previousStage`, `newStage`, `changedFields`, and the user-supplied `occurredAt` value.
 
+Migration `20261015000000_job_drive_correctness.sql` then:
+
+- converts `applied_at` and `apply_by` to `date`, using each owner's profile time zone;
+- moves value rules (URL format, lengths, time zones, interview schedule ⇒ time zone) into table constraints;
+- reduces `apply_job_drive_change` to structure checks, locking, the write, and the activity append; constraint violations return `invalid_payload`;
+- accepts only ISO 8601 dates and timestamps (Postgres alone would accept `yesterday` or `now`);
+- detects duplicates on normalised company and role names, last, rolling back the write if it finds any;
+- makes timestamp defaults independent of the session time zone.
+
 ## Interface
 
 - `src/app/app/layout.tsx` authenticates once and renders `PersistentWorkspace`: the app shell, routed navigation, and the HTTP gateway. After a successful write the gateway calls `router.refresh()`, so the screen re-renders from the database rather than from optimistic client state.
@@ -130,19 +139,13 @@ No placeholder task, Calendar, JD brief, marketplace, or recruiter controls are 
 ```bash
 npm run lint
 npm run typecheck
-npm test
+npm test          # unit
+npm run test:db   # SQL functions, constraints, RLS, migrations, SQL/TS parity
+npm run test:e2e  # Playwright against the preview, desktop and mobile, two time zones
 npm run eval:ai
 npm run build
 ```
 
-Current automated coverage includes all stages, unknown dates, OA windows, interview timezone rules, malformed URL/time input, forward skips, non-regression, terminal states, correction detection, AI ownership boundaries, evidence grounding, migration preservation clauses, provider error mapping, and unsafe-autonomy refusal.
+Automated coverage spans stage rules and non-regression, proposal resolution, evidence grounding, correction detection, normalisation, model-context selection, provider error mapping, and Gemini schema derivation (unit); atomic writes, idempotent creates and confirmations, stale-edit conflicts, corrections, duplicate warnings, value constraints, cross-user isolation, the AI allowance, and the date conversion (database); and the main preview flows (end to end).
 
-The Job Drive migration and a hosted acceptance pass were completed against the connected Supabase project before the Phase 1 refactor; repeat it after applying `20261014000000_ai_quota_and_legacy_cleanup.sql`. The pass covered NLP creation and matching, manual stage changes, OA/interview persistence, duplicate resolution, explicit correction, reload persistence, legacy activity compatibility, and keyboard stage interaction. Responsive layout is implemented with breakpoint-based CSS; repeatable multi-viewport coverage remains part of the planned Playwright suite.
-
-## Deliberate next steps
-
-1. Calendar readiness: separate OAuth consent and per-event approval for apply-by dates, OA windows/deadlines, and interviews.
-2. On-demand application brief: paste a JD and map requirements to user-supplied experience evidence without invented scores.
-3. Playwright browser acceptance plus CI.
-4. Structured observability and provider-evaluation history.
-5. State-aware follow-up proposals only after the core remains dependable.
+The signed-in flow uses Google OAuth and remains a manual acceptance pass. Repeat it after applying `20261014000000_ai_quota_and_legacy_cleanup.sql` and `20261015000000_job_drive_correctness.sql`: sign in, send a message, confirm, reload, edit with a correction, and check the drive's activity.

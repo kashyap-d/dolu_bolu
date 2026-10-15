@@ -43,7 +43,7 @@ The first end-to-end milestone is:
 
 ## Current implementation state
 
-As of October 2026 (Phases 0 and 1 of the plan in `README.md` are complete):
+As of October 2026 (Phases 0–2 of the plan in `README.md` are complete):
 
 - `/login` starts Google OAuth; `/auth/callback` performs the PKCE exchange; `src/proxy.ts` refreshes sessions and guards `/app` routes. `/app/applications` redirects to `/app/drives` via `next.config.ts`.
 - `src/app/app/layout.tsx` authenticates once and renders the shared app shell. `/app` (command center), `/app/drives` (list) and `/app/drives/[driveId]` (detail and activity) each load only the data they render; `error.tsx` and `loading.tsx` cover failures and slow loads.
@@ -54,9 +54,12 @@ As of October 2026 (Phases 0 and 1 of the plan in `README.md` are complete):
 - Manual saves and AI confirmation/rejection use narrow `security definer` Postgres functions. Each confirmed mutation atomically changes the drive/details and appends immutable field-level activity. Creates are idempotent via client UUIDs; edits use `updatedAt` for optimistic concurrency.
 - Likely duplicates are warnings, not hard constraints. Backward moves and reopening terminal drives require an explicit audited correction.
 - UI is built from tokens in `src/app/globals.css` and primitives in `src/components/ui`. Do not use raw hex colours in components.
+- `appliedAt` and `applyBy` are calendar dates (`YYYY-MM-DD`); other event fields are timestamps with offsets. Render dates with `LocalDate` and timestamps with `LocalDateTime`.
+- Company and role matching uses `src/features/job-drives/normalize.ts`, which must stay identical to the SQL `normalize_*` functions (a database test checks parity). The model sees only `selectModelContext` output.
+- Value rules live in table `CHECK` constraints; SQL functions check JSON structure, lock, write, and append activity. The Supabase client is typed from `src/server/supabase/database.types.ts`. Regenerate it with `npm run db:types` after every migration.
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 
-Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order—including `20260916000000_job_drive_foundation.sql` and `20261014000000_ai_quota_and_legacy_cleanup.sql`—configure OAuth redirect URLs, and run all quality gates with the selected provider.
+Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261015000000_job_drive_correctness.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
 ## Explicit non-goals for V1
 
@@ -112,7 +115,7 @@ Keep these responsibilities separate:
 - `src/lib`: small shared utilities that contain no privileged data access.
 - `supabase/migrations`: the reproducible database source of truth.
 - `docs/decisions`: architecture decision records. Read the relevant record before changing a decided area, and add a superseding record instead of contradicting one silently.
-- `tests`: unit and integration coverage; sanitized AI evaluation fixtures live under `evals`.
+- `tests`: unit tests; `tests/db`: database tests against the migrations on plain Postgres; `e2e`: Playwright tests against the preview; `evals`: sanitized AI evaluation cases.
 
 Browser components must not import server modules, provider SDKs, database credentials, or service-role clients. Route handlers should parse the request, call a server service, and return the smallest DTO the UI needs.
 
@@ -163,6 +166,8 @@ npm run dev
 npm run lint
 npm run typecheck
 npm test
+npm run test:db
+npm run test:e2e
 npm run eval:ai
 npm run build
 ```
