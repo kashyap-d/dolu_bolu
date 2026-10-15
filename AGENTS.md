@@ -60,10 +60,11 @@ As of October 2026 (Phases 0–3 of the plan in `README.md` are complete):
 - Interview rounds are a list per drive (max 10). Payloads carry the complete list; the AI proposes one `interviewRound` that `mergeProposedRound` folds into the existing ones.
 - The command center shows an agenda (`buildAgenda`): loose ends, the next 14 days by day, and drives quiet for 21+ days. It renders in the browser only because it depends on the viewer's clock and zone.
 - Messages may be pasted emails or invites up to 8,000 characters. `redactContactDetails` removes email addresses and phone numbers on the server before the provider, evidence checks, or storage see the text.
+- Demo workspaces: `/auth/demo` signs in anonymously and calls `seed_demo_workspace`. `principal.isAnonymous` drives the demo banner. Demo users have smaller AI allowances plus a shared daily pool, and `delete_expired_demo_accounts` (pg_cron) removes them after 7 days. Deployment steps are in `docs/deployment.md`.
 - `/app/settings` ("Your data") exports all of a user's rows as JSON and deletes the account through `delete_my_account`, which cascades through every user-owned table.
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 
-Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261016020000_longer_source_messages.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
+Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261017000000_demo_workspaces.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
 
 ## Explicit non-goals for V1
 

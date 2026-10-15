@@ -10,7 +10,7 @@ import { selectModelContext } from "@/features/assistant/model-context";
 import { redactContactDetails } from "@/features/assistant/redact";
 import { resolveProposal } from "@/features/assistant/resolve-proposal";
 import { getActionProposalProvider } from "@/server/ai/get-provider";
-import { getAiDailyRequestLimit } from "@/server/env";
+import { getAiLimits } from "@/server/env";
 import { consumeAiRequest } from "@/server/repositories/ai-usage-repository";
 import { listJobDrives } from "@/server/repositories/job-drive-repository";
 import {
@@ -20,7 +20,11 @@ import {
 import type { AppSupabaseClient } from "@/server/supabase/server";
 
 export class AiQuotaExceededError extends Error {
-  constructor(readonly limit: number) {
+  constructor(
+    /** "user": this person's daily allowance; "demo": all demo users' shared allowance. */
+    readonly scope: "user" | "demo",
+    readonly limit: number | null,
+  ) {
     super("The daily assistant limit has been reached.");
     this.name = "AiQuotaExceededError";
   }
@@ -95,8 +99,9 @@ export async function prepareProposal(
     : [];
   const provider = getActionProposalProvider({ allowHosted: Boolean(persistence) });
   if (persistence && !provider.isDemo) {
-    const usage = await consumeAiRequest(persistence.supabase, getAiDailyRequestLimit());
-    if (usage.outcome === "limit_reached") throw new AiQuotaExceededError(usage.limit);
+    const usage = await consumeAiRequest(persistence.supabase, getAiLimits());
+    if (usage.outcome === "limit_reached") throw new AiQuotaExceededError("user", usage.limit);
+    if (usage.outcome === "demo_capacity_reached") throw new AiQuotaExceededError("demo", null);
     if (usage.outcome !== "allowed") {
       throw new Error("The AI request allowance could not be reserved.");
     }

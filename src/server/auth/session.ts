@@ -10,12 +10,15 @@ const principalClaimsSchema = z.object({
   sub: z.uuid(),
   email: z.email().optional(),
   user_metadata: z.record(z.string(), z.unknown()).optional(),
+  is_anonymous: z.boolean().optional(),
 });
 
 export interface AuthenticatedPrincipal {
   id: string;
   email: string | null;
   displayName: string | null;
+  /** A demo workspace from anonymous sign-in, deleted after 7 days. */
+  isAnonymous: boolean;
 }
 
 export async function getRequestAuth() {
@@ -42,6 +45,7 @@ export async function getRequestAuth() {
       id: parsed.data.sub,
       email: parsed.data.email ?? null,
       displayName,
+      isAnonymous: parsed.data.is_anonymous ?? false,
     } satisfies AuthenticatedPrincipal,
   };
 }

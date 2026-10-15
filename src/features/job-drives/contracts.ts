@@ -154,7 +154,7 @@ export const activityEventSchema = z
   .object({
     id: z.uuid(),
     eventType: z.string().min(1).max(120),
-    source: z.enum(["manual", "assistant", "migration"]),
+    source: z.enum(["manual", "assistant", "migration", "demo"]),
     previousStage: jobDriveStageSchema.nullable(),
     // Activity created before the Job Drive migration did not record stages.
     // Keep those immutable rows readable instead of manufacturing history.

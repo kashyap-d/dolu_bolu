@@ -125,6 +125,21 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_demo_daily: {
+        Row: {
+          usage_date: string
+          request_count: number
+        }
+        Insert: {
+          usage_date: string
+          request_count?: number
+        }
+        Update: {
+          usage_date?: string
+          request_count?: number
+        }
+        Relationships: []
+      }
       interviews: {
         Row: {
           id: string
@@ -412,14 +427,26 @@ export type Database = {
       consume_ai_request: {
         Args: {
           p_daily_limit: number | null
+          p_demo_daily_limit?: number | null
+          p_demo_global_limit?: number | null
         }
         Returns: Json
+      }
+      delete_expired_demo_accounts: {
+        Args: { [_ in never]: never }
+        Returns: number
       }
       delete_my_account: {
         Args: {
           p_confirmation: string | null
         }
         Returns: Json
+      }
+      is_anonymous_user: {
+        Args: {
+          p_user_id: string | null
+        }
+        Returns: boolean
       }
       is_http_url: {
         Args: {
@@ -522,6 +549,10 @@ export type Database = {
           p_allow_possible_duplicate?: boolean | null
           p_is_correction?: boolean | null
         }
+        Returns: Json
+      }
+      seed_demo_workspace: {
+        Args: { [_ in never]: never }
         Returns: Json
       }
     }

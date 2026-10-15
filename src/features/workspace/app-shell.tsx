@@ -11,6 +11,7 @@ import { useWorkspaceNavigation, WorkspaceLink, type WorkspaceTarget } from "./n
 export interface Viewer {
   displayName: string | null;
   email: string | null;
+  isAnonymous?: boolean;
 }
 
 interface NavItem {
@@ -27,7 +28,8 @@ const allNavItems: NavItem[] = [
   { to: { view: "settings" }, label: "Your data", icon: Settings, persistentOnly: true },
 ];
 
-function initials({ displayName, email }: Viewer) {
+function initials({ displayName, email, isAnonymous }: Viewer) {
+  if (isAnonymous) return "D";
   const source = displayName?.trim() || email?.split("@")[0] || "You";
   return source
     .split(/\s+/)
@@ -108,7 +110,9 @@ export function AppShell({
           </p>
           <p className="mt-1.5 text-xs leading-5 text-subtle">
             {mode === "persistent"
-              ? "Only you can see your drives. Every saved change is recorded in its history."
+              ? viewer.isAnonymous
+                ? "A private demo. It is deleted 7 days after you started it."
+                : "Only you can see your drives. Every saved change is recorded in its history."
               : "Nothing is saved. Data resets when you reload."}
           </p>
         </div>
@@ -159,6 +163,18 @@ export function AppShell({
             ) : null}
           </div>
         </header>
+        {viewer.isAnonymous ? (
+          <div className="flex flex-col gap-2 border-b border-accent-line bg-accent-soft px-5 py-3 text-sm text-accent-ink sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+            <p>
+              <strong>Demo workspace.</strong> The drives here are samples. Everything is deleted after 7 days.
+            </p>
+            <form action="/auth/signout" method="post">
+              <button className="font-semibold underline underline-offset-2" type="submit">
+                Leave the demo and sign in with Google
+              </button>
+            </form>
+          </div>
+        ) : null}
         <main className="mx-auto w-full max-w-[1180px] px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
           {children}
         </main>

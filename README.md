@@ -32,6 +32,7 @@ Manual edits take the same final step. Every architectural choice and its trade-
 - Day-precision facts (applied on, apply by) stored as calendar dates in your own time zone.
 - Row Level Security on every user table; the browser cannot write tables directly.
 - A per-user daily cap on hosted AI requests.
+- Demo workspaces: visitors can try a private, seeded workspace without an account. It is deleted after 7 days, and its AI use is capped.
 - A no-sign-in local preview at `/` when Supabase is not configured. It always uses the deterministic provider and stores nothing.
 
 ## Project structure
@@ -81,6 +82,10 @@ With the template values, [http://localhost:3000](http://localhost:3000) opens t
 
 The provider receives only the message (with email addresses and phone numbers removed), the current time/time zone/locale, and a few summaries of your own drives: those at companies the message names, or up to 10 recent active ones if it names none. There is no silent fallback to another vendor. Check Google's current [Gemini terms and pricing](https://ai.google.dev/gemini-api/docs/pricing); free-tier inputs may be used to improve Google products, so don't test with sensitive data.
 
+### Deploy
+
+See [`docs/deployment.md`](docs/deployment.md) for Vercel and Supabase setup, including the optional demo workspaces and their AI limits.
+
 ## Quality gates
 
 ```bash
@@ -103,7 +108,8 @@ After changing a migration, run `npm run db:types` to regenerate `src/server/sup
 | 1. Structure — done | App shell layout, gateway/navigation abstractions, typed API client, shared route helper, design tokens and primitives, single-proposal contract, tested proposal resolution. |
 | 2. Correctness — done | Date-only fields, normalised drive matching, relevance-based model context, value rules as table constraints, generated database types, Gemini schema derived from Zod, database and end-to-end tests in CI. |
 | 3. Product — done | Agenda home screen with loose ends and quiet drives, paste-anything extraction with contact-detail redaction, interview rounds as a list, data export and account deletion. |
-| Next | Deploy to Vercel with a seeded demo account; signed-in end-to-end tests; reminders for loose ends (with explicit consent). |
+| 4. Deploy — in progress | Demo workspaces and the deployment guide are done; the Vercel project and domain are set up by hand (docs/deployment.md). |
+| Next | A smaller client bundle, reminders for loose ends (with explicit consent), Calendar sync per interview round. |
 | Later | Separately authorized Calendar sync, an evidence-grounded application brief. |
 
 A marketplace, autonomous applications, inbox-wide email access, and a recruiter-facing product are out of scope.

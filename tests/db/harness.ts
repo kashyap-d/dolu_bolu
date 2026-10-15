@@ -63,9 +63,11 @@ export async function createTestDatabase(options: { stopBefore?: string } = {}) 
     applyPendingMigrations: () => applyMigrations(migrations.filter((migration) => isPending(migration.name))),
 
     /** Inserts a user the way Supabase Auth would (which also creates the profile). */
-    async createUser(metadata: Record<string, unknown> = {}) {
+    async createUser(metadata: Record<string, unknown> = {}, options: { anonymous?: boolean } = {}) {
       const id = crypto.randomUUID();
-      await sql`insert into auth.users (id, raw_user_meta_data) values (${id}, ${sql.json(metadata as postgres.JSONValue)})`;
+      await sql`
+        insert into auth.users (id, raw_user_meta_data, is_anonymous)
+        values (${id}, ${sql.json(metadata as postgres.JSONValue)}, ${options.anonymous ?? false})`;
       return id;
     },
 

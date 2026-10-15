@@ -4,12 +4,13 @@ import { buttonClasses } from "@/components/ui/button";
 import { Card, Eyebrow } from "@/components/ui/card";
 import { Notice } from "@/components/ui/notice";
 import { safeNextPath } from "@/lib/safe-next-path";
-import { isSupabaseConfigured } from "@/server/env";
+import { isDemoSignInEnabled, isSupabaseConfigured } from "@/server/env";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const query = await searchParams;
   const next = typeof query.next === "string" ? query.next : null;
   const configured = isSupabaseConfigured();
+  const demoEnabled = isDemoSignInEnabled();
 
   return (
     <main className="grid min-h-screen place-items-center px-5 py-12">
@@ -27,12 +28,24 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
         <div className="mt-7">
           {configured ? (
-            <form action="/auth/google" method="post">
-              <input name="next" type="hidden" value={safeNextPath(next)} />
-              <button className={buttonClasses({ className: "h-11 w-full px-5" })} type="submit">
-                Continue with Google
-              </button>
-            </form>
+            <>
+              <form action="/auth/google" method="post">
+                <input name="next" type="hidden" value={safeNextPath(next)} />
+                <button className={buttonClasses({ className: "h-11 w-full px-5" })} type="submit">
+                  Continue with Google
+                </button>
+              </form>
+              {demoEnabled ? (
+                <form action="/auth/demo" className="mt-3" method="post">
+                  <button className={buttonClasses({ variant: "secondary", className: "h-11 w-full px-5" })} type="submit">
+                    Try a demo workspace
+                  </button>
+                  <p className="mt-2 text-center text-xs leading-5 text-subtle">
+                    No account needed. A private sample workspace, deleted after 7 days.
+                  </p>
+                </form>
+              ) : null}
+            </>
           ) : (
             <Notice tone="attention">
               Supabase is not configured yet. Add the project URL and publishable key to{" "}
@@ -48,7 +61,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         ) : null}
         {query.error ? (
           <p className="mt-4 text-sm text-danger-ink" role="alert">
-            Sign-in was not completed. Please try again.
+            {query.error === "demo" || query.error === "demo_unavailable"
+              ? "The demo could not be started right now. Please try again later."
+              : "Sign-in was not completed. Please try again."}
           </p>
         ) : null}
 

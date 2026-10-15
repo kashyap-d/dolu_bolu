@@ -15,7 +15,7 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0009](0009-date-only-fields.md) | Day-precision facts are stored as dates | Implemented |
 | [0010](0010-target-user-and-naming.md) | Early-career job seekers in India; keep "Job Drive" | Accepted |
 | [0011](0011-ui-tokens-and-primitives.md) | Tailwind with enforced tokens and a few primitives | Implemented |
-| [0012](0012-testing-ci-hosting.md) | Test layers, GitHub Actions CI, Vercel hosting | Implemented except hosting |
+| [0012](0012-testing-ci-hosting.md) | Test layers, GitHub Actions CI, Vercel hosting | Implemented; hosting steps in docs/deployment.md |
 | [0013](0013-data-export-and-deletion.md) | Data export and account deletion ship in V1 | Implemented |
 | [0014](0014-legacy-application-slice-removed.md) | Remove the pre-Job-Drive application slice | Implemented |
 | [0015](0015-workspace-gateway.md) | Views depend on a gateway and navigation abstraction; the server re-render is the source of truth | Implemented |
@@ -24,3 +24,4 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0018](0018-interview-rounds.md) | Interview rounds as a list; the AI proposes one round, merged deterministically | Implemented |
 | [0019](0019-agenda-home.md) | An agenda home: loose ends, next two weeks by day, drives gone quiet | Implemented |
 | [0020](0020-paste-anything.md) | Paste emails and invites; contact details are removed before the model or database sees them | Implemented |
+| [0021](0021-demo-workspaces.md) | Demo workspaces via anonymous sign-in, seeded, AI-capped, deleted after 7 days | Implemented |

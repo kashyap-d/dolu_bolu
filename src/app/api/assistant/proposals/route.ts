@@ -68,9 +68,13 @@ export const POST = previewableJsonRoute(
         return jsonError(409, error.message);
       }
       if (error instanceof AiQuotaExceededError) {
-        return jsonError(429, `You've used today's ${error.limit} assistant requests.`, {
-          recovery: `${KEEP_MESSAGE} Add the update manually or try again tomorrow.`,
-        });
+        return error.scope === "demo"
+          ? jsonError(429, "The demo has used today's shared assistant allowance.", {
+              recovery: `${KEEP_MESSAGE} Add the update manually, or sign in with Google for your own allowance.`,
+            })
+          : jsonError(429, `You've used today's ${error.limit} assistant requests.`, {
+              recovery: `${KEEP_MESSAGE} Add the update manually or try again tomorrow.`,
+            });
       }
       if (error instanceof AiProviderError) {
         const { status, ...response } = providerFailures[error.code];

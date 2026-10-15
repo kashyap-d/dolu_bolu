@@ -16,7 +16,7 @@ async function seed(tx: Tx) {
     interviewRounds: [{ id: crypto.randomUUID(), title: "R1", kind: "technical", status: "scheduled", scheduledAt: null, timeZone: null, mode: "unknown", location: null, meetingUrl: null, notes: null }],
   };
   await tx`select public.save_job_drive(gen_random_uuid(), null, ${tx.json(drive as never)}::jsonb, false, false)`;
-  await tx`select public.consume_ai_request(5)`;
+  await tx`select public.consume_ai_request(5, 10, 300)`;
   await tx`
     select * from public.persist_job_drive_proposal(
       gen_random_uuid(), 'I applied to Acme', 'demo', 'model', 'draft:1', 'Record Acme',

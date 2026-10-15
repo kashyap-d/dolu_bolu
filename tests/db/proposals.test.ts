@@ -123,7 +123,7 @@ describe("AI request allowance", { skip: skipWithoutDatabase }, () => {
   it("allows exactly the daily limit per user", async () => {
     const asha = await db.createUser();
     const ravi = await db.createUser();
-    const consume = (tx: Tx) => tx`select public.consume_ai_request(2) as result`;
+    const consume = (tx: Tx) => tx`select public.consume_ai_request(2, 10, 300) as result`;
     const outcomes = [];
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const [row] = await db.as(asha, consume);
@@ -144,7 +144,7 @@ describe("AI request allowance", { skip: skipWithoutDatabase }, () => {
   });
 
   it("requires authentication", async () => {
-    const [row] = await db.as(null, (tx) => tx`select public.consume_ai_request(5) as result`);
+    const [row] = await db.as(null, (tx) => tx`select public.consume_ai_request(5, 10, 300) as result`);
     assert.equal((row!.result as { outcome: string }).outcome, "auth_required");
   });
 });

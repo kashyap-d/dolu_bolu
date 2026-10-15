@@ -87,6 +87,7 @@ const sourceLabels: Record<ActivityEvent["source"], string> = {
   assistant: "Confirmed AI proposal",
   manual: "Manual update",
   migration: "Migrated record",
+  demo: "Sample data",
 };
 
 function activityTitle(event: ActivityEvent) {

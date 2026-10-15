@@ -77,16 +77,37 @@ const aiDailyRequestLimitSchema = z.coerce
   .max(1_000)
   .default(50);
 
-export function getAiDailyRequestLimit() {
-  const parsed = aiDailyRequestLimitSchema.safeParse(
-    process.env.AI_DAILY_REQUEST_LIMIT || undefined,
-  );
+const aiLimitsSchema = z.object({
+  AI_DAILY_REQUEST_LIMIT: aiDailyRequestLimitSchema,
+  AI_DEMO_DAILY_REQUEST_LIMIT: z.coerce.number().int().min(1).max(1_000).default(10),
+  AI_DEMO_GLOBAL_DAILY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(300),
+});
+
+/** Hosted-AI allowances: per user, per demo user, and for all demo users together. */
+export function getAiLimits() {
+  const parsed = aiLimitsSchema.safeParse({
+    AI_DAILY_REQUEST_LIMIT: process.env.AI_DAILY_REQUEST_LIMIT || undefined,
+    AI_DEMO_DAILY_REQUEST_LIMIT: process.env.AI_DEMO_DAILY_REQUEST_LIMIT || undefined,
+    AI_DEMO_GLOBAL_DAILY_LIMIT: process.env.AI_DEMO_GLOBAL_DAILY_LIMIT || undefined,
+  });
 
   if (!parsed.success) {
-    throw new Error("AI_DAILY_REQUEST_LIMIT must be an integer from 1 to 1000.");
+    throw new Error("AI_*_LIMIT settings must be positive integers within their documented ranges.");
   }
 
-  return parsed.data;
+  return {
+    perUser: parsed.data.AI_DAILY_REQUEST_LIMIT,
+    perDemoUser: parsed.data.AI_DEMO_DAILY_REQUEST_LIMIT,
+    allDemoUsers: parsed.data.AI_DEMO_GLOBAL_DAILY_LIMIT,
+  };
+}
+
+/**
+ * Whether visitors may start a demo workspace through Supabase anonymous
+ * sign-in. Anonymous sign-ins must also be enabled in the Supabase project.
+ */
+export function isDemoSignInEnabled() {
+  return process.env.DEMO_SIGN_IN_ENABLED === "true" && isSupabaseConfigured();
 }
 
 export function getGeminiEnvironment() {

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const storedActivityMetadataSchema = z
   .object({
-    source: z.enum(["manual", "assistant", "migration"]).default("migration"),
+    source: z.enum(["manual", "assistant", "migration", "demo"]).default("migration"),
     previousStage: z.string().nullable().default(null),
     newStage: z.string().nullable().default(null),
     changedFields: z.array(z.string()).default([]),
