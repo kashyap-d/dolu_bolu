@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "node --conditions=react-server --import tsx --test 'tests/*.test.ts'",
+    "test": "node --conditions=react-server --import tsx --test 'tests/*.test.ts' && node --import tsx --test 'tests/*.test.tsx'",
     "test:watch": "node --conditions=react-server --import tsx --test --watch 'tests/*.test.ts'",
     "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts",
     "test:db": "scripts/with-test-db.sh node --conditions=react-server --import tsx --test --test-concurrency=1 'tests/db/*.test.ts'",

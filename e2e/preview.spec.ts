@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./fixtures";
 
 async function send(page: Page, message: string) {
   await page.getByLabel("Describe a Job Drive update").fill(message);
@@ -63,10 +65,13 @@ test("adds a drive manually and records a backward move as a correction", async 
   await page.getByRole("button", { name: "Add round" }).click();
   await page.getByLabel("Round", { exact: true }).nth(1).fill("HR");
   await page.getByLabel(/Applied on/).fill("2026-10-01");
+  // A date-only value shown in the list: it must render the same on server and client.
+  await page.getByLabel(/Apply by/).fill("2026-12-01");
   await page.getByRole("button", { name: "Save Job Drive" }).click();
   await expect(page.getByText("Globex added.")).toBeVisible();
 
   await page.getByRole("button", { name: "View Drives" }).click();
+  await expect(page.getByText("Apply by")).toBeVisible();
   await page.getByRole("button", { name: /Globex/ }).click();
   // A date-only value must not move a day in any time zone.
   await expect(page.locator("p", { hasText: "Applied:" })).toContainText(/1 Oct 2026|Oct 1, 2026/);
