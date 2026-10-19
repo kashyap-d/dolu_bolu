@@ -7,7 +7,7 @@ The command center showed a composer, a drive count, and the next four dates. Th
 
 ## Decision
 `buildAgenda` (pure, unit-tested) derives three groups from the user's drives. Closed drives never appear.
-- **Loose ends:** a round whose time has passed but is still "scheduled", an OA deadline that passed while the OA is still invited or scheduled, an apply-by date that passed while the drive is still planned.
+- **Loose ends:** a round whose time has passed but is still "scheduled", an OA deadline that passed while the OA is still invited or scheduled, an apply-by date that passed while the drive is still planned. Each applies only while the drive has not moved past that stage: reaching an offer answers "how did the interview go?", and starting interviews answers the OA.
 - **Next two weeks:** apply-by dates, OA windows and deadlines, and scheduled rounds, grouped by day in the viewer's time zone ("Today", "Tomorrow", then dates).
 - **Gone quiet:** active drives past planning with no change in 21 days and nothing upcoming. This is a computed flag, not a stage: the user decides whether to follow up or close the drive.
 

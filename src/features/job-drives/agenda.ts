@@ -1,7 +1,7 @@
 import { addDays, calendarDate, endOfLocalDay } from "@/lib/dates";
 
 import type { JobDrive } from "./contracts";
-import { isTerminalStage } from "./stage-rules";
+import { hasMovedPast, isTerminalStage } from "./stage-rules";
 
 export const AGENDA_HORIZON_DAYS = 14;
 export const QUIET_AFTER_DAYS = 21;
@@ -47,12 +47,13 @@ function ref(drive: JobDrive): DriveRef {
   return { id: drive.id, companyName: drive.companyName, roleTitle: drive.roleTitle };
 }
 
-/** Every dated thing a drive has, whether past or future. */
-function datedEvents(drive: JobDrive): AgendaEvent[] {
-  const events: AgendaEvent[] = [];
-  const add = (key: string, label: string, value: string | null, allDay = false) => {
+/** Every dated thing a drive has, whether past or future, with the stage it belongs to. */
+function datedEvents(drive: JobDrive): Array<AgendaEvent & { stage: JobDrive["stage"] }> {
+  const events: Array<AgendaEvent & { stage: JobDrive["stage"] }> = [];
+  const add = (stage: JobDrive["stage"], key: string, label: string, value: string | null, allDay = false) => {
     if (!value) return;
     events.push({
+      stage,
       key: `${drive.id}:${key}`,
       drive: ref(drive),
       label,
@@ -62,14 +63,14 @@ function datedEvents(drive: JobDrive): AgendaEvent[] {
     });
   };
 
-  if (drive.stage === "planned") add("apply-by", "Apply by", drive.applyBy, true);
+  if (drive.stage === "planned") add("planned", "apply-by", "Apply by", drive.applyBy, true);
   const assessment = drive.assessment;
   if (assessment && (assessment.status === "invited" || assessment.status === "scheduled")) {
-    add("oa-opens", "OA opens", assessment.availableFrom);
-    add("oa-due", "OA deadline", assessment.dueAt);
+    add("assessment", "oa-opens", "OA opens", assessment.availableFrom);
+    add("assessment", "oa-due", "OA deadline", assessment.dueAt);
   }
   for (const round of drive.interviewRounds) {
-    if (round.status === "scheduled") add(`round:${round.id}`, round.title, round.scheduledAt);
+    if (round.status === "scheduled") add("interview", `round:${round.id}`, round.title, round.scheduledAt);
   }
   return events;
 }
@@ -92,8 +93,10 @@ export function buildAgenda(drives: readonly JobDrive[], now: number, timeZone: 
     if (isTerminalStage(drive.stage)) continue;
     const events = datedEvents(drive);
 
-    for (const event of events) {
+    for (const { stage, ...event } of events) {
       if (event.at < now) {
+        // Moving the drive on (say, to an offer) answers "how did it go?".
+        if (hasMovedPast(drive.stage, stage)) continue;
         attention.push({
           key: event.key,
           drive: event.drive,

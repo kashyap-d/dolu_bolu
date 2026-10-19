@@ -98,3 +98,34 @@ describe("buildAgenda", () => {
     assert.deepEqual(agenda, { attention: [], upcoming: [], quiet: [] });
   });
 });
+
+describe("buildAgenda once a drive has moved on", () => {
+  const pastRound = () => round({ title: "Hiring manager", scheduledAt: "2026-10-14T10:00:00Z" });
+  const pastOa = {
+    status: "invited" as const, availableFrom: null, dueAt: "2026-10-14T18:30:00Z",
+    durationMinutes: null, assessmentUrl: null, notes: null, updatedAt: "2026-10-10T00:00:00Z",
+  };
+
+  it("stops asking about a past round when the drive has reached an offer", () => {
+    const interviewing = buildAgenda([drive({ stage: "interview", interviewRounds: [pastRound()] })], now, zone);
+    assert.equal(interviewing.attention.length, 1);
+    const offered = buildAgenda([drive({ stage: "offer", interviewRounds: [pastRound()] })], now, zone);
+    assert.deepEqual(offered.attention, []);
+  });
+
+  it("stops asking about a passed OA deadline once interviews have started", () => {
+    const assessing = buildAgenda([drive({ stage: "assessment", assessment: pastOa })], now, zone);
+    assert.equal(assessing.attention.length, 1);
+    const interviewing = buildAgenda([drive({ stage: "interview", assessment: pastOa })], now, zone);
+    assert.deepEqual(interviewing.attention, []);
+  });
+
+  it("still shows upcoming rounds whatever the stage", () => {
+    const agenda = buildAgenda(
+      [drive({ stage: "offer", interviewRounds: [round({ title: "HR", scheduledAt: "2026-10-16T10:00:00Z" })] })],
+      now,
+      zone,
+    );
+    assert.equal(agenda.upcoming[0]?.events[0]?.label, "HR");
+  });
+});

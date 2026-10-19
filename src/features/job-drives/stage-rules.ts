@@ -39,6 +39,13 @@ export function isTerminalStage(stage: JobDriveStage) {
   return stage === "accepted" || terminalJobDriveStages.includes(stage);
 }
 
+/** True when `current` is a later primary stage than `reference`. */
+export function hasMovedPast(current: JobDriveStage, reference: JobDriveStage) {
+  const currentRank = stageRank.get(current);
+  const referenceRank = stageRank.get(reference);
+  return currentRank !== undefined && referenceRank !== undefined && currentRank > referenceRank;
+}
+
 export function isBackwardStageChange(
   previous: JobDriveStage,
   next: JobDriveStage,
