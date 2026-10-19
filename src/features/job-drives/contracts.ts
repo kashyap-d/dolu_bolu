@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 // Zod 4 still runs refinements after z.url() fails, so guard the URL
 // constructor: an unparsable value must be a validation issue, not a throw.

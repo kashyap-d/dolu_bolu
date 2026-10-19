@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod";
 
 import { interviewRoundFields, jobDriveProgressPayloadSchema } from "@/features/job-drives/contracts";
 

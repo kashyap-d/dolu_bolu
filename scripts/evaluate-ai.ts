@@ -2,7 +2,7 @@ import "server-only";
 
 import { readFile } from "node:fs/promises";
 
-import { z } from "zod";
+import * as z from "zod";
 
 import { MAX_MESSAGE_LENGTH } from "@/features/assistant/contracts";
 import { validateProposalEvidence, validateProposalForConfirmation } from "@/features/assistant/validate-proposal";

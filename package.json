@@ -16,7 +16,8 @@
     "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts",
     "test:db": "scripts/with-test-db.sh node --conditions=react-server --import tsx --test --test-concurrency=1 'tests/db/*.test.ts'",
     "db:types": "scripts/with-test-db.sh node --import tsx scripts/generate-db-types.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:bundle": "node --import tsx scripts/check-bundle.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

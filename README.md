@@ -91,6 +91,7 @@ npm run test:db     # database tests; needs PostgreSQL 15+ installed locally, or
 npm run test:e2e    # Playwright; run `npx playwright install chromium` once
 npm run eval:ai     # uses the configured provider
 npm run build
+npm run check:bundle  # client JavaScript budget; run after build
 ```
 
 After changing a migration, run `npm run db:types` to regenerate `src/server/supabase/database.types.ts`. CI runs everything above with the deterministic provider and fails if the generated types are stale.

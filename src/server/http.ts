@@ -1,6 +1,6 @@
 import "server-only";
 
-import { z } from "zod";
+import * as z from "zod";
 
 import { getRequestAuth } from "@/server/auth/session";
 import { isSupabaseConfigured } from "@/server/env";

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { z } from "zod";
+import * as z from "zod";
 
 import { RepositoryError } from "@/server/repositories/errors";
 import type { AppSupabaseClient } from "@/server/supabase/server";

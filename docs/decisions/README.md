@@ -24,3 +24,4 @@ Short records of significant choices: the context, what we chose, what we reject
 | [0018](0018-interview-rounds.md) | Interview rounds as a list; the AI proposes one round, merged deterministically | Implemented |
 | [0019](0019-agenda-home.md) | An agenda home: loose ends, next two weeks by day, drives gone quiet | Implemented |
 | [0020](0020-paste-anything.md) | Paste emails and invites; contact details are removed before the model or database sees them | Implemented |
+| [0022](0022-client-bundle-budget.md) | Import Zod as a namespace; CI enforces a client bundle budget | Implemented |

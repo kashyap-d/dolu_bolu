@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { z } from "zod";
+import type * as z from "zod";
 
 /**
  * A storage failure the user can retry. Messages are for server logs only;

@@ -150,7 +150,7 @@ Store timestamps as `timestamptz`; unknown dates stay null. Assessments and inte
 
 ## Engineering conventions
 
-- Use strict TypeScript; avoid `any`. Prefer inferred types from shared Zod schemas.
+- Use strict TypeScript; avoid `any`. Prefer inferred types from shared Zod schemas, imported as `import * as z from "zod"` (lint-enforced; see docs/decisions/0022).
 - Validate at every boundary: HTTP input, provider output, environment configuration, and database-returned JSON payloads.
 - Keep React Server Components by default and add `"use client"` only at the smallest interactive boundary.
 - Prefer pure functions for parsing, normalization, validation, and action execution decisions.
@@ -174,6 +174,7 @@ npm run test:db
 npm run test:e2e
 npm run eval:ai
 npm run build
+npm run check:bundle
 ```
 
 Before changing framework code, read the version-matched guides in `node_modules/next/dist/docs/` as required by the generated rule above.

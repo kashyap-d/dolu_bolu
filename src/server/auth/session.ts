@@ -1,7 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
+import * as z from "zod";
 
 import { isSupabaseConfigured } from "@/server/env";
 import { createSupabaseServerClient } from "@/server/supabase/server";
