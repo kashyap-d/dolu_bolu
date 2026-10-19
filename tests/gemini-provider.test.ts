@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { z } from "zod";
+import * as z from "zod";
 
 import { providerDecisionSchema } from "../src/features/assistant/contracts";
 import { AiProviderError } from "../src/server/ai/action-proposal-provider";
