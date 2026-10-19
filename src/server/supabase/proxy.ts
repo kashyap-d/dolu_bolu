@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { principalFromClaims } from "@/server/auth/principal";
 import { getSupabaseEnvironment } from "@/server/env";
 
 export async function refreshSupabaseSession(request: NextRequest) {
@@ -36,7 +37,9 @@ export async function refreshSupabaseSession(request: NextRequest) {
   const { data, error } = await supabase.auth.getClaims();
 
   return {
-    authenticated: !error && Boolean(data?.claims.sub),
+    // The same rule as the page layout, so the two can never disagree and
+    // redirect between /login and /app forever.
+    authenticated: !error && principalFromClaims(data?.claims) !== null,
     response,
   };
 }

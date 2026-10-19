@@ -1,53 +1,19 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 
+import { principalFromClaims } from "@/server/auth/principal";
 import { isSupabaseConfigured } from "@/server/env";
 import { createSupabaseServerClient } from "@/server/supabase/server";
-
-const principalClaimsSchema = z.object({
-  sub: z.uuid(),
-  email: z.email().optional(),
-  user_metadata: z.record(z.string(), z.unknown()).optional(),
-  is_anonymous: z.boolean().optional(),
-});
-
-export interface AuthenticatedPrincipal {
-  id: string;
-  email: string | null;
-  displayName: string | null;
-  /** A demo workspace from anonymous sign-in, deleted after 7 days. */
-  isAnonymous: boolean;
-}
 
 export async function getRequestAuth() {
   if (!isSupabaseConfigured()) return null;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getClaims();
-  const parsed = principalClaimsSchema.safeParse(data?.claims);
-
-  if (error || !parsed.success) return null;
-
-  const fullName = parsed.data.user_metadata?.full_name;
-  const name = parsed.data.user_metadata?.name;
-  const displayName =
-    typeof fullName === "string" && fullName.trim()
-      ? fullName.trim()
-      : typeof name === "string" && name.trim()
-        ? name.trim()
-        : null;
-
-  return {
-    supabase,
-    principal: {
-      id: parsed.data.sub,
-      email: parsed.data.email ?? null,
-      displayName,
-      isAnonymous: parsed.data.is_anonymous ?? false,
-    } satisfies AuthenticatedPrincipal,
-  };
+  const principal = error ? null : principalFromClaims(data?.claims);
+  if (!principal) return null;
+  return { supabase, principal };
 }
 
 export async function requirePageAuth() {
@@ -55,3 +21,5 @@ export async function requirePageAuth() {
   if (!auth) redirect("/login");
   return auth;
 }
+
+export type { AuthenticatedPrincipal } from "@/server/auth/principal";
