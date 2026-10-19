@@ -69,7 +69,7 @@ With the template values, [http://localhost:3000](http://localhost:3000) opens t
 ### Connect Supabase
 
 1. Create a Supabase project. Set `NEXT_PUBLIC_SUPABASE_URL` (the base URL, without `/rest/v1`) and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-2. Apply every file in `supabase/migrations` in filename order. Connecting a GitHub repository does not run them for you.
+2. Apply the migrations with the Supabase CLI: `npx supabase login`, `npx supabase link --project-ref <project-ref>`, then `npm run db:push`. `npm run db:status` shows what is applied. See [`docs/deployment.md`](docs/deployment.md) if the project was previously migrated by hand.
 3. Enable the Google provider in Supabase Authentication, and add `https://<project-ref>.supabase.co/auth/v1/callback` to the Google OAuth client.
 4. In Supabase URL Configuration, set the Site URL to `http://localhost:3000` and allow `http://localhost:3000/auth/callback`.
 5. Restart `npm run dev`. `/` now redirects to `/app`.

@@ -4,7 +4,19 @@ Vercel hosts the Next.js app and Supabase hosts auth and Postgres (docs/decision
 
 ## 1. Supabase
 
-1. **Migrations.** Apply every file in `supabase/migrations` in filename order (SQL editor, or `supabase db push` if you use the CLI). Skip the ones already applied.
+1. **Migrations.** Apply them with the Supabase CLI (installed as a dev dependency). It records each migration it applies in `supabase_migrations.schema_migrations`, so it only ever runs what is pending:
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <project-ref>
+   npm run db:push     # applies pending migrations; asks for the database password
+   npm run db:status   # local vs. remote: which migrations are applied
+   ```
+   `<project-ref>` is the subdomain of `NEXT_PUBLIC_SUPABASE_URL`. Do not paste migrations into the SQL editor: those runs are not recorded, and the CLI would try to apply them again.
+
+   **Adopting the CLI on a project migrated by hand.** Mark the migrations that are already applied, once, before the first push. Check first: each listed migration must really be in the database.
+   ```bash
+   npx supabase migration repair --status applied 20260914000000 20260915000000 20260916000000 20261014000000 20261015000000
+   ```
 2. **Demo cleanup.** Enable the Cron integration (Integrations → Cron, which installs `pg_cron`), then run once in the SQL editor:
    ```sql
    select cron.schedule('delete-expired-demo-accounts', '17 3 * * *', 'select public.delete_expired_demo_accounts()');

@@ -16,7 +16,9 @@
     "eval:ai": "node --conditions=react-server --import tsx scripts/evaluate-ai.ts",
     "test:db": "scripts/with-test-db.sh node --conditions=react-server --import tsx --test --test-concurrency=1 'tests/db/*.test.ts'",
     "db:types": "scripts/with-test-db.sh node --import tsx scripts/generate-db-types.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:status": "supabase migration list",
+    "db:push": "supabase db push"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -37,6 +39,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "postgres": "^3.4.9",
+    "supabase": "2.119.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5"

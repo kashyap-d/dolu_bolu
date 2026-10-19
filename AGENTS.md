@@ -64,7 +64,7 @@ As of October 2026 (Phases 0–3 of the plan in `README.md` are complete):
 - `/app/settings` ("Your data") exports all of a user's rows as JSON and deletes the account through `delete_my_account`, which cascades through every user-owned table.
 - Calendar, JD briefs, tasks, search, and recruiter-facing controls are hidden rather than presented as working features.
 
-Before calling the hosted slice operational, apply every migration in `supabase/migrations` in order (through `20261017000000_demo_workspaces.sql`), configure OAuth redirect URLs, and run all quality gates with the selected provider.
+Before calling the hosted slice operational, apply pending migrations with `npm run db:push` (the Supabase CLI records what is applied; `npm run db:status` lists it), configure OAuth redirect URLs, and run all quality gates with the selected provider. Never apply migrations by pasting them into the SQL editor: those runs are not recorded.
 
 ## Explicit non-goals for V1
 
